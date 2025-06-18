@@ -1,0 +1,201 @@
+import 'package:flutter/material.dart';
+
+void main() {
+  runApp(GeraeteManagerApp());
+}
+
+class GeraeteManagerApp extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'Gerätemanager',
+      home: HomeScreen(),
+      debugShowCheckedModeBanner: false,
+    );
+  }
+}
+
+class Geraet {
+  String nummer;
+  String modell;
+  String seriennummer;
+
+  Geraet({
+    required this.nummer,
+    required this.modell,
+    required this.seriennummer,
+  });
+}
+
+class HomeScreen extends StatefulWidget {
+  @override
+  _HomeScreenState createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  final _nummerController = TextEditingController();
+  final _seriennummerController = TextEditingController();
+
+  final List<Geraet> _geraeteListe = [];
+  final List<String> _modellOptionen = ['bizhub C250i', 'bizhub C300i', 'bizhub C360i'];
+  String? _ausgewaehltesModell;
+
+  void _hinzufuegen() {
+    if (_nummerController.text.isNotEmpty &&
+        _seriennummerController.text.isNotEmpty &&
+        _ausgewaehltesModell != null) {
+      setState(() {
+        _geraeteListe.add(Geraet(
+          nummer: _nummerController.text,
+          modell: _ausgewaehltesModell!,
+          seriennummer: _seriennummerController.text,
+        ));
+        _nummerController.clear();
+        _seriennummerController.clear();
+        _ausgewaehltesModell = null;
+      });
+    }
+  }
+
+  void _bearbeiten(int index) {
+    final geraet = _geraeteListe[index];
+
+    final nummerController = TextEditingController(text: geraet.nummer);
+    final seriennummerController = TextEditingController(text: geraet.seriennummer);
+    String bearbeitetesModell = geraet.modell;
+
+    showDialog(
+      context: context,
+      builder: (_) => StatefulBuilder(
+        builder: (context, setStateDialog) {
+          return AlertDialog(
+            title: Text('Gerät bearbeiten'),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    controller: nummerController,
+                    decoration: InputDecoration(labelText: 'Gerätenummer'),
+                  ),
+                  DropdownButtonFormField<String>(
+                    value: bearbeitetesModell,
+                    items: _modellOptionen.map((modell) {
+                      return DropdownMenuItem(
+                        value: modell,
+                        child: Text(modell),
+                      );
+                    }).toList(),
+                    onChanged: (value) {
+                      setStateDialog(() {
+                        bearbeitetesModell = value!;
+                      });
+                    },
+                    decoration: InputDecoration(labelText: 'Modell'),
+                  ),
+                  TextField(
+                    controller: seriennummerController,
+                    decoration: InputDecoration(labelText: 'Seriennummer'),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: Text('Abbrechen'),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  setState(() {
+                    _geraeteListe[index] = Geraet(
+                      nummer: nummerController.text,
+                      modell: bearbeitetesModell,
+                      seriennummer: seriennummerController.text,
+                    );
+                  });
+                  Navigator.of(context).pop();
+                },
+                child: Text('Speichern'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  void _loeschen(int index) {
+    setState(() {
+      _geraeteListe.removeAt(index);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: Text('Gerätemanager')),
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          children: [
+            TextField(
+              controller: _nummerController,
+              decoration: InputDecoration(labelText: 'Gerätenummer'),
+            ),
+            DropdownButtonFormField<String>(
+              value: _ausgewaehltesModell,
+              items: _modellOptionen.map((modell) {
+                return DropdownMenuItem(
+                  value: modell,
+                  child: Text(modell),
+                );
+              }).toList(),
+              onChanged: (value) {
+                setState(() {
+                  _ausgewaehltesModell = value;
+                });
+              },
+              decoration: InputDecoration(labelText: 'Modell'),
+            ),
+            TextField(
+              controller: _seriennummerController,
+              decoration: InputDecoration(labelText: 'Seriennummer'),
+            ),
+            SizedBox(height: 10),
+            ElevatedButton(
+              onPressed: _hinzufuegen,
+              child: Text('Hinzufügen'),
+            ),
+            SizedBox(height: 20),
+            Expanded(
+              child: ListView.builder(
+                itemCount: _geraeteListe.length,
+                itemBuilder: (context, index) {
+                  final g = _geraeteListe[index];
+                  return ListTile(
+                    title: Text('${g.nummer} – ${g.modell}'),
+                    subtitle: Text('Seriennummer: ${g.seriennummer}'),
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          icon: Icon(Icons.edit),
+                          onPressed: () => _bearbeiten(index),
+                        ),
+                        IconButton(
+                          icon: Icon(Icons.delete),
+                          onPressed: () => _loeschen(index),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
