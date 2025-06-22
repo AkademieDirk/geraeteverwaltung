@@ -1,40 +1,46 @@
 import 'package:flutter/material.dart';
 
 class ZubehoerSection extends StatelessWidget {
-  final List<String> originaleinzugTypen;
-  final String? selectedOriginaleinzugTyp;
-  final ValueChanged<String?> onOriginaleinzugTypChanged;
+  // Originaleinzug
+  final List<String> originaleinzugTypOptionen;
+  final String selectedOriginaleinzugTyp;
+  final ValueChanged<String?> onChangedOriginaleinzugTyp;
   final TextEditingController originaleinzugSNController;
 
-  final List<String> unterschrankTypen;
-  final String? selectedUnterschrankTyp;
-  final ValueChanged<String?> onUnterschrankTypChanged;
+  // Unterschrank
+  final List<String> unterschrankTypOptionen;
+  final String selectedUnterschrankTyp;
+  final ValueChanged<String?> onChangedUnterschrankTyp;
   final TextEditingController unterschrankSNController;
 
-  final List<String> finisherTypen;
-  final String? selectedFinisherTyp;
-  final ValueChanged<String?> onFinisherTypChanged;
+  // Finisher
+  final List<String> finisherOptionen;
+  final String selectedFinisher;
+  final ValueChanged<String?> onChangedFinisher;
   final TextEditingController finisherSNController;
 
-  final String? selectedFax;
-  final ValueChanged<String?> onFaxChanged;
+  // Fax
+  final List<String> jaNeinOptionen;
+  final String selectedFax;
+  final ValueChanged<String?> onChangedFax;
 
   const ZubehoerSection({
     Key? key,
-    required this.originaleinzugTypen,
+    required this.originaleinzugTypOptionen,
     required this.selectedOriginaleinzugTyp,
-    required this.onOriginaleinzugTypChanged,
+    required this.onChangedOriginaleinzugTyp,
     required this.originaleinzugSNController,
-    required this.unterschrankTypen,
+    required this.unterschrankTypOptionen,
     required this.selectedUnterschrankTyp,
-    required this.onUnterschrankTypChanged,
+    required this.onChangedUnterschrankTyp,
     required this.unterschrankSNController,
-    required this.finisherTypen,
-    required this.selectedFinisherTyp,
-    required this.onFinisherTypChanged,
+    required this.finisherOptionen,
+    required this.selectedFinisher,
+    required this.onChangedFinisher,
     required this.finisherSNController,
+    required this.jaNeinOptionen,
     required this.selectedFax,
-    required this.onFaxChanged,
+    required this.onChangedFax,
   }) : super(key: key);
 
   @override
@@ -42,77 +48,78 @@ class ZubehoerSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Zubehör:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+        const Text('Zubehör:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
         Row(
           children: [
             Expanded(
               child: DropdownButtonFormField<String>(
                 value: selectedOriginaleinzugTyp,
-                decoration: InputDecoration(labelText: 'Originaleinzug Typ'),
-                items: originaleinzugTypen
-                    .map((v) => DropdownMenuItem(value: v, child: Text(v)))
+                decoration: const InputDecoration(labelText: 'Originaleinzug Typ'),
+                items: originaleinzugTypOptionen
+                    .map((s) => DropdownMenuItem(value: s, child: Text(s)))
                     .toList(),
-                onChanged: onOriginaleinzugTypChanged,
+                onChanged: onChangedOriginaleinzugTyp,
               ),
             ),
-            SizedBox(width: 8),
+            const SizedBox(width: 8),
             Expanded(
               child: TextFormField(
                 controller: originaleinzugSNController,
-                decoration: InputDecoration(labelText: 'Seriennummer'),
+                decoration: const InputDecoration(labelText: 'Seriennummer'),
               ),
             ),
           ],
         ),
+        const SizedBox(height: 8),
         Row(
           children: [
             Expanded(
               child: DropdownButtonFormField<String>(
                 value: selectedUnterschrankTyp,
-                decoration: InputDecoration(labelText: 'Unterschrank Typ'),
-                items: unterschrankTypen
-                    .map((v) => DropdownMenuItem(value: v, child: Text(v)))
+                decoration: const InputDecoration(labelText: 'Unterschrank Typ'),
+                items: unterschrankTypOptionen
+                    .map((s) => DropdownMenuItem(value: s, child: Text(s)))
                     .toList(),
-                onChanged: onUnterschrankTypChanged,
+                onChanged: onChangedUnterschrankTyp,
               ),
             ),
-            SizedBox(width: 8),
+            const SizedBox(width: 8),
             Expanded(
               child: TextFormField(
                 controller: unterschrankSNController,
-                decoration: InputDecoration(labelText: 'Seriennummer'),
+                decoration: const InputDecoration(labelText: 'Seriennummer'),
               ),
             ),
           ],
         ),
+        const SizedBox(height: 8),
         Row(
           children: [
             Expanded(
               child: DropdownButtonFormField<String>(
-                value: selectedFinisherTyp,
-                decoration: InputDecoration(labelText: 'Finisher'),
-                items: finisherTypen
-                    .map((v) => DropdownMenuItem(value: v, child: Text(v)))
+                value: selectedFinisher,
+                decoration: const InputDecoration(labelText: 'Finisher'),
+                items: finisherOptionen
+                    .map((s) => DropdownMenuItem(value: s, child: Text(s)))
                     .toList(),
-                onChanged: onFinisherTypChanged,
+                onChanged: onChangedFinisher,
               ),
             ),
-            SizedBox(width: 8),
+            const SizedBox(width: 8),
             Expanded(
               child: TextFormField(
                 controller: finisherSNController,
-                decoration: InputDecoration(labelText: 'Seriennummer'),
+                decoration: const InputDecoration(labelText: 'Seriennummer'),
               ),
             ),
           ],
         ),
+        const SizedBox(height: 8),
         DropdownButtonFormField<String>(
           value: selectedFax,
-          decoration: InputDecoration(labelText: 'Fax'),
-          items: ['Ja', 'Nein']
-              .map((v) => DropdownMenuItem(value: v, child: Text(v)))
-              .toList(),
-          onChanged: onFaxChanged,
+          decoration: const InputDecoration(labelText: 'Fax'),
+          items: jaNeinOptionen.map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
+          onChanged: onChangedFax,
         ),
       ],
     );
