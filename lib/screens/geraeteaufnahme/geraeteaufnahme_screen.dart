@@ -5,7 +5,7 @@ class GeraeteAufnahmeScreen extends StatefulWidget {
   final List<Geraet> vorhandeneGeraete;
   final Geraet? initialGeraet;
 
-  const GeraeteAufnahmeScreen({
+  GeraeteAufnahmeScreen({
     Key? key,
     required this.vorhandeneGeraete,
     this.initialGeraet,
@@ -18,38 +18,44 @@ class GeraeteAufnahmeScreen extends StatefulWidget {
 class _GeraeteAufnahmeScreenState extends State<GeraeteAufnahmeScreen> {
   final _formKey = GlobalKey<FormState>();
 
+  // Dropdown-Optionen (jeweils mit "Nichts ausgewählt" als Standard)
   final List<String> _mitarbeiterOptionen = [
-    'Patrick Heidrich',
-    'Carsten Sobota',
-    'Melanie Toffel',
-    'Dirk Kraft'
+    'Nichts ausgewählt', 'Patrick Heidrich', 'Carsten Sobota', 'Melanie Toffel', 'Dirk Kraft'
   ];
   final List<String> _modellOptionen = [
-    'bizhub C250i',
-    'bizhub C300i',
-    'bizhub C360i',
-    'andere'
+    'Nichts ausgewählt', 'bizhub C250i', 'bizhub C300i', 'bizhub C360i', 'andere'
   ];
-  final List<String> _jaNeinOptionen = ['Ja', 'Nein'];
-  final List<String> _pdfTypen = ['A', 'B'];
+  final List<String> _jaNeinOptionen = ['Nichts ausgewählt', 'Ja', 'Nein'];
+  final List<String> _pdfTypen = ['Nichts ausgewählt', 'A', 'B'];
   final List<int> _prozentSchritte = List.generate(11, (i) => i * 10);
 
-  String? _selectedMitarbeiter;
-  String? _selectedModell;
+  final List<String> _originaleinzugTypOptionen = [
+    'Nichts ausgewählt', 'Kein', 'DF-714', 'DF-715', 'DF-632', 'DF-633', 'Sonstiges'
+  ];
+  final List<String> _unterschrankTypOptionen = [
+    'Nichts ausgewählt', 'Kein', 'PC-116', 'PC-216', 'PC-416', 'Sonstiges'
+  ];
+  final List<String> _finisherOptionen = [
+    'Nichts ausgewählt', 'Kein', 'FS-533', 'FS-539', 'FS-532', 'Sonstiges'
+  ];
+
+  // Felder
+  String _selectedMitarbeiter = 'Nichts ausgewählt';
+  String _selectedModell = 'Nichts ausgewählt';
   final _nummerController = TextEditingController();
   final _seriennummerController = TextEditingController();
 
-  String? _selectedIOption;
-  String? _selectedPdfTyp;
-  String? _selectedDurchsuchbar;
+  String _selectedIOption = 'Nichts ausgewählt';
+  String _selectedPdfTyp = 'Nichts ausgewählt';
+  String _selectedDurchsuchbar = 'Nichts ausgewählt';
 
-  final _originaleinzugTypController = TextEditingController();
+  String _selectedOriginaleinzugTyp = 'Nichts ausgewählt';
   final _originaleinzugSNController = TextEditingController();
-  final _unterschrankTypController = TextEditingController();
+  String _selectedUnterschrankTyp = 'Nichts ausgewählt';
   final _unterschrankSNController = TextEditingController();
-  final _finisherController = TextEditingController();
+  String _selectedFinisher = 'Nichts ausgewählt';
   final _finisherSNController = TextEditingController();
-  String _selectedFax = 'Nein';
+  String _selectedFax = 'Nichts ausgewählt';
 
   final _zaehlerGesamtController = TextEditingController();
   final _zaehlerSWController = TextEditingController();
@@ -60,7 +66,6 @@ class _GeraeteAufnahmeScreenState extends State<GeraeteAufnahmeScreen> {
   int _tonerC = 0;
   int _tonerM = 0;
   int _tonerY = 0;
-
   int _laufzeitBildeinheitK = 0;
   int _laufzeitBildeinheitC = 0;
   int _laufzeitBildeinheitM = 0;
@@ -87,19 +92,19 @@ class _GeraeteAufnahmeScreenState extends State<GeraeteAufnahmeScreen> {
     if (widget.initialGeraet != null) {
       final g = widget.initialGeraet!;
       _nummerController.text = g.nummer;
-      _selectedModell = g.modell;
+      _selectedModell = g.modell.isNotEmpty ? g.modell : 'Nichts ausgewählt';
       _seriennummerController.text = g.seriennummer;
-      _selectedMitarbeiter = g.mitarbeiter;
-      _selectedIOption = g.iOption;
-      _selectedPdfTyp = g.pdfTyp;
-      _selectedDurchsuchbar = g.durchsuchbar;
-      _originaleinzugTypController.text = g.originaleinzugTyp;
+      _selectedMitarbeiter = g.mitarbeiter.isNotEmpty ? g.mitarbeiter : 'Nichts ausgewählt';
+      _selectedIOption = g.iOption.isNotEmpty ? g.iOption : 'Nichts ausgewählt';
+      _selectedPdfTyp = g.pdfTyp.isNotEmpty ? g.pdfTyp : 'Nichts ausgewählt';
+      _selectedDurchsuchbar = g.durchsuchbar.isNotEmpty ? g.durchsuchbar : 'Nichts ausgewählt';
+      _selectedOriginaleinzugTyp = g.originaleinzugTyp.isNotEmpty ? g.originaleinzugTyp : 'Nichts ausgewählt';
       _originaleinzugSNController.text = g.originaleinzugSN;
-      _unterschrankTypController.text = g.unterschrankTyp;
+      _selectedUnterschrankTyp = g.unterschrankTyp.isNotEmpty ? g.unterschrankTyp : 'Nichts ausgewählt';
       _unterschrankSNController.text = g.unterschrankSN;
-      _finisherController.text = g.finisher;
+      _selectedFinisher = g.finisher.isNotEmpty ? g.finisher : 'Nichts ausgewählt';
       _finisherSNController.text = g.finisherSN;
-      _selectedFax = g.fax.isNotEmpty ? g.fax : 'Nein';
+      _selectedFax = g.fax.isNotEmpty ? g.fax : 'Nichts ausgewählt';
       _zaehlerGesamtController.text = g.zaehlerGesamt.toString();
       _zaehlerSWController.text = g.zaehlerSW.toString();
       _zaehlerColorController.text = g.zaehlerColor.toString();
@@ -108,7 +113,6 @@ class _GeraeteAufnahmeScreenState extends State<GeraeteAufnahmeScreen> {
       _tonerC = g.tonerC;
       _tonerM = g.tonerM;
       _tonerY = g.tonerY;
-
       _laufzeitBildeinheitK = g.laufzeitBildeinheitK;
       _laufzeitBildeinheitC = g.laufzeitBildeinheitC;
       _laufzeitBildeinheitM = g.laufzeitBildeinheitM;
@@ -119,7 +123,6 @@ class _GeraeteAufnahmeScreenState extends State<GeraeteAufnahmeScreen> {
       _laufzeitEntwicklerY = g.laufzeitEntwicklerY;
       _laufzeitFixiereinheit = g.laufzeitFixiereinheit;
       _laufzeitTransferbelt = g.laufzeitTransferbelt;
-
       _fach1Controller.text = g.fach1 ?? '';
       _fach2Controller.text = g.fach2 ?? '';
       _fach3Controller.text = g.fach3 ?? '';
@@ -135,11 +138,8 @@ class _GeraeteAufnahmeScreenState extends State<GeraeteAufnahmeScreen> {
   void dispose() {
     _nummerController.dispose();
     _seriennummerController.dispose();
-    _originaleinzugTypController.dispose();
     _originaleinzugSNController.dispose();
-    _unterschrankTypController.dispose();
     _unterschrankSNController.dispose();
-    _finisherController.dispose();
     _finisherSNController.dispose();
     _zaehlerGesamtController.dispose();
     _zaehlerSWController.dispose();
@@ -156,7 +156,7 @@ class _GeraeteAufnahmeScreenState extends State<GeraeteAufnahmeScreen> {
   }
 
   void _saveGeraet() {
-    if (_nummerController.text.trim().isEmpty || _selectedModell == null) {
+    if (_nummerController.text.trim().isEmpty || _selectedModell == 'Nichts ausgewählt') {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Bitte Gerätenummer und Modell angeben!')),
       );
@@ -176,21 +176,24 @@ class _GeraeteAufnahmeScreenState extends State<GeraeteAufnahmeScreen> {
     int zaehlerColor = int.tryParse(_zaehlerColorController.text) ?? 0;
     int zaehlerGesamt = zaehlerSW + zaehlerColor;
 
+    // "Nichts ausgewählt" als leeren String abspeichern
+    String clean(String val) => val == 'Nichts ausgewählt' ? '' : val;
+
     final neuesGeraet = Geraet(
       nummer: _nummerController.text.trim(),
-      modell: _selectedModell ?? '',
+      modell: clean(_selectedModell),
       seriennummer: _seriennummerController.text.trim(),
-      mitarbeiter: _selectedMitarbeiter ?? '',
-      iOption: _selectedIOption ?? 'Nein',
-      pdfTyp: _selectedPdfTyp ?? 'A',
-      durchsuchbar: _selectedDurchsuchbar ?? 'Nein',
-      originaleinzugTyp: _originaleinzugTypController.text.trim(),
+      mitarbeiter: clean(_selectedMitarbeiter),
+      iOption: clean(_selectedIOption),
+      pdfTyp: clean(_selectedPdfTyp),
+      durchsuchbar: clean(_selectedDurchsuchbar),
+      originaleinzugTyp: clean(_selectedOriginaleinzugTyp),
       originaleinzugSN: _originaleinzugSNController.text.trim(),
-      unterschrankTyp: _unterschrankTypController.text.trim(),
+      unterschrankTyp: clean(_selectedUnterschrankTyp),
       unterschrankSN: _unterschrankSNController.text.trim(),
-      finisher: _finisherController.text.trim(),
+      finisher: clean(_selectedFinisher),
       finisherSN: _finisherSNController.text.trim(),
-      fax: _selectedFax,
+      fax: clean(_selectedFax),
       zaehlerGesamt: zaehlerGesamt,
       zaehlerSW: zaehlerSW,
       zaehlerColor: zaehlerColor,
@@ -237,9 +240,7 @@ class _GeraeteAufnahmeScreenState extends State<GeraeteAufnahmeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text('Geräteaufnahme'),
-      ),
+      appBar: AppBar(title: Text('Geräteaufnahme')),
       body: Padding(
         padding: const EdgeInsets.all(24.0),
         child: Form(
@@ -250,7 +251,7 @@ class _GeraeteAufnahmeScreenState extends State<GeraeteAufnahmeScreen> {
                 value: _selectedMitarbeiter,
                 decoration: InputDecoration(labelText: 'Verantwortlicher Mitarbeiter'),
                 items: _mitarbeiterOptionen.map((m) => DropdownMenuItem(value: m, child: Text(m))).toList(),
-                onChanged: (val) => setState(() => _selectedMitarbeiter = val),
+                onChanged: (val) => setState(() => _selectedMitarbeiter = val ?? 'Nichts ausgewählt'),
               ),
               TextFormField(
                 controller: _nummerController,
@@ -260,7 +261,7 @@ class _GeraeteAufnahmeScreenState extends State<GeraeteAufnahmeScreen> {
                 value: _selectedModell,
                 decoration: InputDecoration(labelText: 'Modell*'),
                 items: _modellOptionen.map((m) => DropdownMenuItem(value: m, child: Text(m))).toList(),
-                onChanged: (val) => setState(() => _selectedModell = val),
+                onChanged: (val) => setState(() => _selectedModell = val ?? 'Nichts ausgewählt'),
               ),
               TextFormField(
                 controller: _seriennummerController,
@@ -270,30 +271,33 @@ class _GeraeteAufnahmeScreenState extends State<GeraeteAufnahmeScreen> {
                 value: _selectedIOption,
                 decoration: InputDecoration(labelText: 'I-Option'),
                 items: _jaNeinOptionen.map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
-                onChanged: (val) => setState(() => _selectedIOption = val),
+                onChanged: (val) => setState(() => _selectedIOption = val ?? 'Nichts ausgewählt'),
               ),
               DropdownButtonFormField<String>(
                 value: _selectedPdfTyp,
                 decoration: InputDecoration(labelText: 'PDF Typ'),
                 items: _pdfTypen.map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
-                onChanged: (val) => setState(() => _selectedPdfTyp = val),
+                onChanged: (val) => setState(() => _selectedPdfTyp = val ?? 'Nichts ausgewählt'),
               ),
               DropdownButtonFormField<String>(
                 value: _selectedDurchsuchbar,
                 decoration: InputDecoration(labelText: 'Durchsuchbar'),
                 items: _jaNeinOptionen.map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
-                onChanged: (val) => setState(() => _selectedDurchsuchbar = val),
+                onChanged: (val) => setState(() => _selectedDurchsuchbar = val ?? 'Nichts ausgewählt'),
               ),
               const SizedBox(height: 22),
-
-              // Zubehör
+              // Zubehör: jetzt komplett mit Dropdowns!
               Text('Zubehör:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
               Row(
                 children: [
                   Expanded(
-                    child: TextFormField(
-                      controller: _originaleinzugTypController,
+                    child: DropdownButtonFormField<String>(
+                      value: _selectedOriginaleinzugTyp,
                       decoration: InputDecoration(labelText: 'Originaleinzug Typ'),
+                      items: _originaleinzugTypOptionen
+                          .map((s) => DropdownMenuItem(value: s, child: Text(s)))
+                          .toList(),
+                      onChanged: (val) => setState(() => _selectedOriginaleinzugTyp = val ?? 'Nichts ausgewählt'),
                     ),
                   ),
                   SizedBox(width: 8),
@@ -308,9 +312,13 @@ class _GeraeteAufnahmeScreenState extends State<GeraeteAufnahmeScreen> {
               Row(
                 children: [
                   Expanded(
-                    child: TextFormField(
-                      controller: _unterschrankTypController,
+                    child: DropdownButtonFormField<String>(
+                      value: _selectedUnterschrankTyp,
                       decoration: InputDecoration(labelText: 'Unterschrank Typ'),
+                      items: _unterschrankTypOptionen
+                          .map((s) => DropdownMenuItem(value: s, child: Text(s)))
+                          .toList(),
+                      onChanged: (val) => setState(() => _selectedUnterschrankTyp = val ?? 'Nichts ausgewählt'),
                     ),
                   ),
                   SizedBox(width: 8),
@@ -325,9 +333,13 @@ class _GeraeteAufnahmeScreenState extends State<GeraeteAufnahmeScreen> {
               Row(
                 children: [
                   Expanded(
-                    child: TextFormField(
-                      controller: _finisherController,
+                    child: DropdownButtonFormField<String>(
+                      value: _selectedFinisher,
                       decoration: InputDecoration(labelText: 'Finisher'),
+                      items: _finisherOptionen
+                          .map((s) => DropdownMenuItem(value: s, child: Text(s)))
+                          .toList(),
+                      onChanged: (val) => setState(() => _selectedFinisher = val ?? 'Nichts ausgewählt'),
                     ),
                   ),
                   SizedBox(width: 8),
@@ -343,10 +355,9 @@ class _GeraeteAufnahmeScreenState extends State<GeraeteAufnahmeScreen> {
                 value: _selectedFax,
                 decoration: InputDecoration(labelText: 'Fax'),
                 items: _jaNeinOptionen.map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
-                onChanged: (val) => setState(() => _selectedFax = val ?? 'Nein'),
+                onChanged: (val) => setState(() => _selectedFax = val ?? 'Nichts ausgewählt'),
               ),
               const SizedBox(height: 22),
-
               // Zählerstände
               Text('Zählerstände:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
               Row(
@@ -387,7 +398,6 @@ class _GeraeteAufnahmeScreenState extends State<GeraeteAufnahmeScreen> {
                 ],
               ),
               const SizedBox(height: 22),
-
               // Füllstände/RTB/Toner
               Text('Füllstände (in %):', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
               const SizedBox(height: 8),
@@ -405,7 +415,6 @@ class _GeraeteAufnahmeScreenState extends State<GeraeteAufnahmeScreen> {
                 ],
               ),
               const SizedBox(height: 22),
-
               // Laufzeiten - Bildeinheit (pro Farbe)
               Text('Laufzeiten Bildeinheit (jeweils %):', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
               Row(
@@ -419,7 +428,6 @@ class _GeraeteAufnahmeScreenState extends State<GeraeteAufnahmeScreen> {
                   _buildProzentDropdown('Y', _laufzeitBildeinheitY, (val) => setState(() => _laufzeitBildeinheitY = val ?? 0)),
                 ],
               ),
-
               const SizedBox(height: 22),
               Text('Laufzeiten Entwickler (jeweils %):', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
               Row(
@@ -433,7 +441,6 @@ class _GeraeteAufnahmeScreenState extends State<GeraeteAufnahmeScreen> {
                   _buildProzentDropdown('Y', _laufzeitEntwicklerY, (val) => setState(() => _laufzeitEntwicklerY = val ?? 0)),
                 ],
               ),
-
               const SizedBox(height: 22),
               Row(
                 children: [
@@ -443,7 +450,6 @@ class _GeraeteAufnahmeScreenState extends State<GeraeteAufnahmeScreen> {
                 ],
               ),
               const SizedBox(height: 22),
-
               // Testergebnisse und Zustand
               Text('Testergebnisse und Zustand', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
               Row(
@@ -503,8 +509,6 @@ class _GeraeteAufnahmeScreenState extends State<GeraeteAufnahmeScreen> {
                 ],
               ),
               SizedBox(height: 22),
-
-              // Bemerkung (Freitext)
               TextFormField(
                 controller: _bemerkungController,
                 decoration: InputDecoration(
@@ -515,7 +519,6 @@ class _GeraeteAufnahmeScreenState extends State<GeraeteAufnahmeScreen> {
                 maxLines: 4,
               ),
               SizedBox(height: 22),
-
               ElevatedButton(
                 onPressed: _saveGeraet,
                 child: Text('Speichern'),
