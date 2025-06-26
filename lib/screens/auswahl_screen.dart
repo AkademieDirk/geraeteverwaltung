@@ -1,27 +1,35 @@
-import 'geraeteaufnahme/geraeteaufnahme_screen.dart';
 import 'package:flutter/material.dart';
+import 'geraeteaufnahme/geraeteaufnahme_screen.dart';
 import 'geraeteliste_screen.dart';
 import 'zubehoer_screen.dart';
 import 'aufbereitung_screen.dart';
+import 'historie_screen.dart';
 import '../models/geraet.dart';
 import '../models/ersatzteil.dart';
+import '../models/verbautes_teil.dart'; // Wichtig: Import des neuen Modells
 
 class AuswahlScreen extends StatefulWidget {
   final List<Geraet> geraete;
   final List<Ersatzteil> ersatzteile;
+  // --- GEÄNDERT: Akzeptiert jetzt 'VerbautesTeil'-Objekte ---
+  final Map<String, List<VerbautesTeil>> verbauteTeile;
+
   final void Function(int, Geraet) onEdit;
   final void Function(int) onDelete;
   final void Function(Geraet) onAdd;
   final void Function(List<Ersatzteil>) onErsatzteileChanged;
+  final void Function(String, Ersatzteil) onTeilVerbauen;
 
   const AuswahlScreen({
     Key? key,
     required this.geraete,
     required this.ersatzteile,
+    required this.verbauteTeile,
     required this.onEdit,
     required this.onDelete,
     required this.onAdd,
     required this.onErsatzteileChanged,
+    required this.onTeilVerbauen,
   }) : super(key: key);
 
   @override
@@ -53,11 +61,8 @@ class _AuswahlScreenState extends State<AuswahlScreen> {
                     ),
                   ),
                 );
-                print('DEBUG: Zurück von Geräteaufnahme: $result');
                 if (result != null) {
-                  print('DEBUG: Gerät gespeichert! $result');
                   widget.onAdd(result);
-                  setState(() {}); // Falls du eine Live-Aktualisierung willst
                 }
               },
             ),
@@ -70,7 +75,7 @@ class _AuswahlScreenState extends State<AuswahlScreen> {
                   context,
                   MaterialPageRoute(
                     builder: (_) => GeraeteListeScreen(
-                      geraete: List.from(widget.geraete),
+                      geraete: widget.geraete,
                       onEdit: widget.onEdit,
                       onDelete: widget.onDelete,
                     ),
@@ -88,14 +93,7 @@ class _AuswahlScreenState extends State<AuswahlScreen> {
                   MaterialPageRoute(
                     builder: (_) => ZubehoerScreen(
                       ersatzteile: widget.ersatzteile,
-                      onErsatzteileChanged: (neueListe) {
-                        setState(() {
-                          widget.ersatzteile
-                            ..clear()
-                            ..addAll(neueListe);
-                          widget.onErsatzteileChanged(widget.ersatzteile);
-                        });
-                      },
+                      onErsatzteileChanged: widget.onErsatzteileChanged,
                     ),
                   ),
                 );
@@ -108,7 +106,30 @@ class _AuswahlScreenState extends State<AuswahlScreen> {
               onTap: () {
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (_) => AufbereitungScreen()),
+                  MaterialPageRoute(
+                    builder: (_) => AufbereitungScreen(
+                      alleGeraete: widget.geraete,
+                      alleErsatzteile: widget.ersatzteile,
+                      // GEÄNDERT: Übergibt die korrekten Daten
+                      verbauteTeile: widget.verbauteTeile,
+                      onTeilVerbauen: widget.onTeilVerbauen,
+                    ),
+                  ),
+                );
+              },
+            ),
+            _SelectionBox(
+              title: 'Historie',
+              icon: Icons.history,
+              color: Colors.teal,
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => HistorieScreen(
+                      verbauteTeile: widget.verbauteTeile,
+                    ),
+                  ),
                 );
               },
             ),

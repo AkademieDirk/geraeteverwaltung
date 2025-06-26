@@ -1,3 +1,5 @@
+// lib/models/ersatzteil.dart
+
 class Ersatzteil {
   String artikelnummer;
   String bezeichnung;
