@@ -18,11 +18,40 @@ class GeraeteAufnahmeScreen extends StatefulWidget {
 class _GeraeteAufnahmeScreenState extends State<GeraeteAufnahmeScreen> {
   final _formKey = GlobalKey<FormState>();
 
+  // --- ANFANG DER ÄNDERUNG ---
+  // Die Liste der Modelle wurde basierend auf Ihrer Vorlage aktualisiert.
+  final List<String> _modellOptionen = [
+    'Nichts ausgewählt',
+    // A3 Farbsysteme
+    'bizhub C250i', 'bizhub C251i', 'bizhub C257i',
+    'bizhub C300i', 'bizhub C301i',
+    'bizhub C360i', 'bizhub C361i',
+    'bizhub C451i', 'bizhub C551i', 'bizhub C651i', 'bizhub C751i',
+    'bizhub C258', 'bizhub C308', 'bizhub C368',
+    'bizhub C458', 'bizhub C558', 'bizhub C658',
+    'bizhub C224e', 'bizhub C284e', 'bizhub C364e',
+    'bizhub C454e', 'bizhub C554e',
+    // A4 Farbsysteme
+    'bizhub C3301i', 'bizhub C3321i',
+    'bizhub C3351i',
+    'bizhub C4051i',
+    'bizhub C3350i', 'bizhub C3851',
+    'bizhub C3351', 'bizhub C3851FS',
+    // A3 S/W-Systeme
+    'bizhub 227', 'bizhub 287', 'bizhub 367',
+    'bizhub 301i', 'bizhub 361i',
+    'bizhub 451i', 'bizhub 551i', 'bizhub 651i', 'bizhub 751i',
+    // A4 S/W-Systeme
+    'bizhub 4000i', 'bizhub 4051i', 'bizhub 4701i', 'bizhub 4751i',
+    'bizhub 4052', 'bizhub 4702p', 'bizhub 4752',
+    'andere' // Option für andere Modelle
+  ];
+  // --- ENDE DER ÄNDERUNG ---
+
   // Dropdown-Optionen
   final List<String> _mitarbeiterOptionen = ['Nichts ausgewählt', 'Patrick Heidrich', 'Carsten Sobota', 'Melanie Toffel', 'Dirk Kraft'];
-  final List<String> _modellOptionen = ['Nichts ausgewählt', 'bizhub C250i', 'bizhub C300i', 'bizhub C360i', 'andere'];
   final List<String> _jaNeinOptionen = ['Nichts ausgewählt', 'Ja', 'Nein'];
-  final List<String> _pdfTypen = ['Nichts ausgewählt', 'A/B', ];
+  final List<String> _pdfTypen = ['Nichts ausgewählt', 'A', 'B'];
   final List<int> _prozentSchritte = List.generate(11, (i) => i * 10);
   final List<String> _originaleinzugTypOptionen = ['Nichts ausgewählt', 'Kein', 'DF-714', 'DF-715', 'DF-632', 'DF-633', 'Sonstiges'];
   final List<String> _unterschrankTypOptionen = ['Nichts ausgewählt', 'Kein', 'PC-116', 'PC-216', 'PC-416', 'Sonstiges'];
@@ -43,7 +72,7 @@ class _GeraeteAufnahmeScreenState extends State<GeraeteAufnahmeScreen> {
   String _selectedFinisher = 'Nichts ausgewählt';
   final _finisherSNController = TextEditingController();
   String _selectedFax = 'Nichts ausgewählt';
-  final _faxSNController = TextEditingController(); // NEU
+  final _faxSNController = TextEditingController();
   final _zaehlerGesamtController = TextEditingController();
   final _zaehlerSWController = TextEditingController();
   final _zaehlerColorController = TextEditingController();
@@ -90,7 +119,7 @@ class _GeraeteAufnahmeScreenState extends State<GeraeteAufnahmeScreen> {
       _selectedFinisher = g.finisher.isNotEmpty ? g.finisher : 'Nichts ausgewählt';
       _finisherSNController.text = g.finisherSN;
       _selectedFax = g.fax.isNotEmpty ? g.fax : 'Nichts ausgewählt';
-      _faxSNController.text = g.faxSN; // NEU
+      _faxSNController.text = g.faxSN;
       _zaehlerGesamtController.text = g.zaehlerGesamt;
       _zaehlerSWController.text = g.zaehlerSW;
       _zaehlerColorController.text = g.zaehlerColor;
@@ -127,7 +156,7 @@ class _GeraeteAufnahmeScreenState extends State<GeraeteAufnahmeScreen> {
     _originaleinzugSNController.dispose();
     _unterschrankSNController.dispose();
     _finisherSNController.dispose();
-    _faxSNController.dispose(); // NEU
+    _faxSNController.dispose();
     _zaehlerGesamtController.dispose();
     _zaehlerSWController.dispose();
     _zaehlerColorController.dispose();
@@ -168,7 +197,7 @@ class _GeraeteAufnahmeScreenState extends State<GeraeteAufnahmeScreen> {
       finisher: clean(_selectedFinisher),
       finisherSN: _finisherSNController.text.trim(),
       fax: clean(_selectedFax),
-      faxSN: _faxSNController.text.trim(), // NEU
+      faxSN: _faxSNController.text.trim(),
       zaehlerGesamt: _zaehlerGesamtController.text,
       zaehlerSW: _zaehlerSWController.text,
       zaehlerColor: _zaehlerColorController.text,
@@ -231,18 +260,20 @@ class _GeraeteAufnahmeScreenState extends State<GeraeteAufnahmeScreen> {
             children: [
               DropdownButtonFormField<String>(value: _selectedMitarbeiter, decoration: const InputDecoration(labelText: 'Verantwortlicher Mitarbeiter'), items: _mitarbeiterOptionen.map((m) => DropdownMenuItem(value: m, child: Text(m))).toList(), onChanged: (val) => setState(() => _selectedMitarbeiter = val ?? 'Nichts ausgewählt')),
               TextFormField(controller: _nummerController, decoration: const InputDecoration(labelText: 'Gerätenummer*')),
-              DropdownButtonFormField<String>(value: _selectedModell, decoration: const InputDecoration(labelText: 'Modell*'), items: _modellOptionen.map((m) => DropdownMenuItem(value: m, child: Text(m))).toList(), onChanged: (val) => setState(() => _selectedModell = val ?? 'Nichts ausgewählt')),
+              DropdownButtonFormField<String>(
+                value: _selectedModell,
+                decoration: const InputDecoration(labelText: 'Modell*'),
+                items: _modellOptionen.map((m) => DropdownMenuItem(value: m, child: Text(m))).toList(),
+                onChanged: (val) => setState(() => _selectedModell = val ?? 'Nichts ausgewählt'),
+              ),
               TextFormField(controller: _seriennummerController, decoration: const InputDecoration(labelText: 'Seriennummer')),
               DropdownButtonFormField<String>(value: _selectedIOption, decoration: const InputDecoration(labelText: 'I-Option'), items: _jaNeinOptionen.map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(), onChanged: (val) => setState(() => _selectedIOption = val ?? 'Nichts ausgewählt')),
               DropdownButtonFormField<String>(value: _selectedPdfTyp, decoration: const InputDecoration(labelText: 'PDF Typ'), items: _pdfTypen.map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(), onChanged: (val) => setState(() => _selectedPdfTyp = val ?? 'Nichts ausgewählt')),
               DropdownButtonFormField<String>(value: _selectedDurchsuchbar, decoration: const InputDecoration(labelText: 'Durchsuchbar'), items: _jaNeinOptionen.map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(), onChanged: (val) => setState(() => _selectedDurchsuchbar = val ?? 'Nichts ausgewählt')),
               const SizedBox(height: 22),
-
               const Text('Zubehör:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
               Row(children: [Expanded(child: DropdownButtonFormField<String>(value: _selectedOriginaleinzugTyp, decoration: const InputDecoration(labelText: 'Originaleinzug Typ'), items: _originaleinzugTypOptionen.map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(), onChanged: (val) => setState(() => _selectedOriginaleinzugTyp = val ?? 'Nichts ausgewählt'))), const SizedBox(width: 8), Expanded(child: TextFormField(controller: _originaleinzugSNController, decoration: const InputDecoration(labelText: 'Seriennummer')))]),
               Row(children: [Expanded(child: DropdownButtonFormField<String>(value: _selectedUnterschrankTyp, decoration: const InputDecoration(labelText: 'Unterschrank Typ'), items: _unterschrankTypOptionen.map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(), onChanged: (val) => setState(() => _selectedUnterschrankTyp = val ?? 'Nichts ausgewählt'))), const SizedBox(width: 8), Expanded(child: TextFormField(controller: _unterschrankSNController, decoration: const InputDecoration(labelText: 'Seriennummer')))]),
-
-              // --- GEÄNDERT: Finisher Sektion ---
               Row(
                 children: [
                   Expanded(
@@ -253,20 +284,9 @@ class _GeraeteAufnahmeScreenState extends State<GeraeteAufnahmeScreen> {
                       onChanged: (val) => setState(() => _selectedFinisher = val ?? 'Nichts ausgewählt'),
                     ),
                   ),
-                  // Bedingte Anzeige des SN-Felds
-                  if (showFinisherSN) ...[
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: TextFormField(
-                        controller: _finisherSNController,
-                        decoration: const InputDecoration(labelText: 'Seriennummer'),
-                      ),
-                    ),
-                  ]
+                  if (showFinisherSN) ...[const SizedBox(width: 8), Expanded(child: TextFormField(controller: _finisherSNController, decoration: const InputDecoration(labelText: 'Seriennummer')))]
                 ],
               ),
-
-              // --- GEÄNDERT: Fax Sektion ---
               Row(
                 children: [
                   Expanded(
@@ -277,20 +297,10 @@ class _GeraeteAufnahmeScreenState extends State<GeraeteAufnahmeScreen> {
                       onChanged: (val) => setState(() => _selectedFax = val ?? 'Nichts ausgewählt'),
                     ),
                   ),
-                  // Bedingte Anzeige des SN-Felds
-                  if (showFaxSN) ...[
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: TextFormField(
-                        controller: _faxSNController,
-                        decoration: const InputDecoration(labelText: 'Seriennummer'),
-                      ),
-                    ),
-                  ]
+                  if (showFaxSN) ...[const SizedBox(width: 8), Expanded(child: TextFormField(controller: _faxSNController, decoration: const InputDecoration(labelText: 'Seriennummer')))]
                 ],
               ),
               const SizedBox(height: 22),
-
               const Text('Zählerstände:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
               Row(children: [Expanded(child: TextFormField(controller: _zaehlerSWController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'S/W'), onChanged: (val) => setState(() { final sw = int.tryParse(val) ?? 0; final color = int.tryParse(_zaehlerColorController.text) ?? 0; _zaehlerGesamtController.text = (sw + color).toString(); }))), const SizedBox(width: 8), Expanded(child: TextFormField(controller: _zaehlerColorController, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Color'), onChanged: (val) => setState(() { final color = int.tryParse(val) ?? 0; final sw = int.tryParse(_zaehlerSWController.text) ?? 0; _zaehlerGesamtController.text = (sw + color).toString(); }))), const SizedBox(width: 8), Expanded(child: TextFormField(controller: _zaehlerGesamtController, readOnly: true, decoration: const InputDecoration(labelText: 'Gesamt (Auto)')))]),
               const SizedBox(height: 22),

@@ -3,7 +3,7 @@ import '../models/ersatzteil.dart';
 
 class ZubehoerScreen extends StatefulWidget {
   final List<Ersatzteil> ersatzteile;
-  // GEÄNDERT: Neue Callbacks für Firestore-Operationen
+  // Nimmt die Firestore-Funktionen entgegen
   final Future<void> Function(Ersatzteil) onAdd;
   final Future<void> Function(Ersatzteil) onUpdate;
   final Future<void> Function(String) onDelete;
@@ -21,8 +21,27 @@ class ZubehoerScreen extends StatefulWidget {
 }
 
 class _ZubehoerScreenState extends State<ZubehoerScreen> {
+  // --- NEU: Controller und State für die Suche ---
+  final TextEditingController _searchController = TextEditingController();
+  String _searchTerm = '';
 
-  final List<String> _kategorien = ['Toner', 'Drum', 'Fixierung', 'Transferbelt', 'Sonstiges'];
+  final List<String> _kategorien = ['Toner', 'Drum', 'Transferbelt', 'Fixierung', 'Entwickler', 'Sonstiges'];
+
+  @override
+  void initState() {
+    super.initState();
+    _searchController.addListener(() {
+      setState(() {
+        _searchTerm = _searchController.text;
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
   void _neuesErsatzteilDialog({Ersatzteil? ersatzteil}) {
     final isEdit = ersatzteil != null;
@@ -76,7 +95,7 @@ class _ZubehoerScreenState extends State<ZubehoerScreen> {
               }
 
               final neuesTeil = Ersatzteil(
-                id: isEdit ? ersatzteil.id : '', // Wichtig: ID beim Bearbeiten beibehalten
+                id: isEdit ? ersatzteil.id : '',
                 artikelnummer: artikel,
                 bezeichnung: bez,
                 lieferant: lief,
@@ -117,10 +136,24 @@ class _ZubehoerScreenState extends State<ZubehoerScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // --- NEU: Filterlogik ---
+    final List<Ersatzteil> gefilterteListe;
+    if (_searchTerm.isEmpty) {
+      gefilterteListe = widget.ersatzteile;
+    } else {
+      gefilterteListe = widget.ersatzteile.where((teil) {
+        final suchbegriff = _searchTerm.toLowerCase();
+        return teil.bezeichnung.toLowerCase().contains(suchbegriff) ||
+            teil.artikelnummer.toLowerCase().contains(suchbegriff);
+      }).toList();
+    }
+
     Map<String, List<Ersatzteil>> gruppiert = {};
-    for (var et in widget.ersatzteile) {
+    for (var et in gefilterteListe) {
       gruppiert.putIfAbsent(et.kategorie, () => []).add(et);
     }
+
+    final sortierteKategorien = gruppiert.keys.toList()..sort();
 
     return Scaffold(
       appBar: AppBar(
@@ -133,43 +166,75 @@ class _ZubehoerScreenState extends State<ZubehoerScreen> {
           )
         ],
       ),
-      body: gruppiert.isEmpty
-          ? const Center(child: Text('Noch keine Ersatzteile vorhanden. Fügen Sie welche hinzu!'))
-          : ListView(
-        children: gruppiert.entries.map((eintrag) {
-          final kategorie = eintrag.key;
-          final teile = eintrag.value;
-          return Card(
-            margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-            child: ExpansionTile(
-              title: Text(kategorie, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-              initiallyExpanded: true,
-              children: teile.map((teil) => Card(
-                margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 12),
-                child: ListTile(
-                  title: Text('${teil.bezeichnung} (${teil.artikelnummer})'),
-                  subtitle: Text('Lieferant: ${teil.lieferant}'),
-                  trailing: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text('${teil.preis.toStringAsFixed(2)} €'),
-                      IconButton(
-                        icon: const Icon(Icons.edit, color: Colors.orange),
-                        tooltip: 'Bearbeiten',
-                        onPressed: () => _neuesErsatzteilDialog(ersatzteil: teil),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.delete, color: Colors.red),
-                        tooltip: 'Löschen',
-                        onPressed: () => _deleteErsatzteil(teil),
-                      ),
-                    ],
-                  ),
-                ),
-              )).toList(),
+      // --- GEÄNDERT: Body ist jetzt eine Spalte ---
+      body: Column(
+        children: [
+          // --- NEU: Suchfeld ---
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: TextField(
+              controller: _searchController,
+              decoration: InputDecoration(
+                labelText: 'Suche nach Bezeichnung oder Artikelnummer',
+                prefixIcon: const Icon(Icons.search),
+                suffixIcon: _searchTerm.isNotEmpty
+                    ? IconButton(
+                  icon: const Icon(Icons.clear),
+                  onPressed: () => _searchController.clear(),
+                )
+                    : null,
+                border: const OutlineInputBorder(),
+              ),
             ),
-          );
-        }).toList(),
+          ),
+          // --- NEU: Liste ist jetzt in einem Expanded-Widget ---
+          Expanded(
+            child: gruppiert.isEmpty
+                ? const Center(child: Text('Keine passenden Ersatzteile gefunden.'))
+                : ListView(
+              children: sortierteKategorien.map((kategorie) {
+                final teile = gruppiert[kategorie]!;
+                return Card(
+                  margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+                  child: ExpansionTile(
+                    title: Text(
+                      '$kategorie (${teile.length})',
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                    ),
+                    children: teile.map((teil) => Card(
+                      elevation: 0,
+                      margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 12),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          side: BorderSide(color: Colors.grey.shade200)
+                      ),
+                      child: ListTile(
+                        title: Text('${teil.bezeichnung} (${teil.artikelnummer})'),
+                        subtitle: Text('Lieferant: ${teil.lieferant}'),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text('${teil.preis.toStringAsFixed(2)} €'),
+                            IconButton(
+                              icon: const Icon(Icons.edit, color: Colors.orange),
+                              tooltip: 'Bearbeiten',
+                              onPressed: () => _neuesErsatzteilDialog(ersatzteil: teil),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.delete, color: Colors.red),
+                              tooltip: 'Löschen',
+                              onPressed: () => _deleteErsatzteil(teil),
+                            ),
+                          ],
+                        ),
+                      ),
+                    )).toList(),
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+        ],
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _neuesErsatzteilDialog(),
