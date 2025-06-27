@@ -1,15 +1,16 @@
 import 'package:flutter/material.dart';
 import '../models/geraet.dart';
 import '../models/ersatzteil.dart';
-import '../models/verbautes_teil.dart'; // Wichtig: Import des neuen Modells
+import '../models/verbautes_teil.dart';
 import 'historie_screen.dart';
 
 class AufbereitungScreen extends StatefulWidget {
   final List<Geraet> alleGeraete;
   final List<Ersatzteil> alleErsatzteile;
-  // --- GEÄNDERT: Akzeptiert jetzt die korrekte Datenstruktur mit Datum ---
   final Map<String, List<VerbautesTeil>> verbauteTeile;
-  final void Function(String, Ersatzteil) onTeilVerbauen;
+  final Future<void> Function(String, Ersatzteil) onTeilVerbauen;
+  final Future<void> Function(String, VerbautesTeil) onDeleteVerbautesTeil;
+  final Future<void> Function(String, VerbautesTeil) onUpdateVerbautesTeil;
 
   const AufbereitungScreen({
     Key? key,
@@ -17,6 +18,8 @@ class AufbereitungScreen extends StatefulWidget {
     required this.alleErsatzteile,
     required this.verbauteTeile,
     required this.onTeilVerbauen,
+    required this.onDeleteVerbautesTeil,
+    required this.onUpdateVerbautesTeil,
   }) : super(key: key);
 
   @override
@@ -92,7 +95,6 @@ class _AufbereitungScreenState extends State<AufbereitungScreen> {
 
     setState(() {
       _showSnackbar(context, '${verbautesTeil.bezeichnung} wurde Gerät $seriennummer zugeordnet.');
-
       _foundArticle = null;
       _selectedErsatzteil = null;
       _articleNumberController.clear();
@@ -115,8 +117,9 @@ class _AufbereitungScreenState extends State<AufbereitungScreen> {
                 context,
                 MaterialPageRoute(
                   builder: (context) => HistorieScreen(
-                    // Übergibt die korrekte Datenstruktur
                     verbauteTeile: widget.verbauteTeile,
+                    onDelete: widget.onDeleteVerbautesTeil,
+                    onUpdate: widget.onUpdateVerbautesTeil,
                   ),
                 ),
               );
@@ -178,7 +181,7 @@ class _AufbereitungScreenState extends State<AufbereitungScreen> {
                       DropdownButtonFormField<String>(
                         value: _selectedPartType,
                         decoration: const InputDecoration(labelText: 'Art des Ersatzteils', border: OutlineInputBorder()),
-                        items: ['Toner', 'Drum', 'TBU', 'Entwickler', 'Fixiereinheit'].map((label) => DropdownMenuItem(value: label, child: Text(label))).toList(),
+                        items: ['Toner', 'Drum', 'Transferbelt', 'Entwickler', 'Fixiereinheit'].map((label) => DropdownMenuItem(value: label, child: Text(label))).toList(),
                         onChanged: (value) {
                           if (value == null) return;
                           setState(() {
@@ -192,14 +195,20 @@ class _AufbereitungScreenState extends State<AufbereitungScreen> {
                       ),
                       const SizedBox(height: 16),
                       if (_gefilterteErsatzteile.isNotEmpty)
+                      // --- ANFANG DER ÄNDERUNG ---
                         DropdownButtonFormField<Ersatzteil>(
+                          isExpanded: true, // Sorgt dafür, dass das Feld die Breite ausnutzt
                           value: _selectedErsatzteil,
                           hint: const Text('Gefundenes Teil auswählen'),
                           decoration: const InputDecoration(labelText: 'Bezeichnung', border: OutlineInputBorder()),
                           items: _gefilterteErsatzteile.map((ersatzteil) {
                             return DropdownMenuItem<Ersatzteil>(
                               value: ersatzteil,
-                              child: Text(ersatzteil.bezeichnung),
+                              // Das Kind ist ein Text, der bei Überlauf mit "..." abgeschnitten wird.
+                              child: Text(
+                                ersatzteil.bezeichnung,
+                                overflow: TextOverflow.ellipsis,
+                              ),
                             );
                           }).toList(),
                           onChanged: (ersatzteil) {
@@ -211,6 +220,7 @@ class _AufbereitungScreenState extends State<AufbereitungScreen> {
                             });
                           },
                         ),
+                      // --- ENDE DER ÄNDERUNG ---
                       const SizedBox(height: 16),
                       TextField(
                         controller: _articleNumberController,
@@ -256,8 +266,6 @@ class _AufbereitungScreenState extends State<AufbereitungScreen> {
                   ),
                 ),
               ),
-              const SizedBox(height: 24),
-              // Platzhalter für weitere Arbeitsschritte
             ],
           ),
         ),

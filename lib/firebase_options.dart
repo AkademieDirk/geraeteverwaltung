@@ -55,6 +55,7 @@ class DefaultFirebaseOptions {
     messagingSenderId: '733804575642',
     projectId: 'geraeteverwaltung-4e8e6',
     authDomain: 'geraeteverwaltung-4e8e6.firebaseapp.com',
+    databaseURL: 'https://geraeteverwaltung-4e8e6-default-rtdb.europe-west1.firebasedatabase.app',
     storageBucket: 'geraeteverwaltung-4e8e6.firebasestorage.app',
     measurementId: 'G-ZEEVH2CG5V',
   );
@@ -65,6 +66,7 @@ class DefaultFirebaseOptions {
     messagingSenderId: '733804575642',
     projectId: 'geraeteverwaltung-4e8e6',
     authDomain: 'geraeteverwaltung-4e8e6.firebaseapp.com',
+    databaseURL: 'https://geraeteverwaltung-4e8e6-default-rtdb.europe-west1.firebasedatabase.app',
     storageBucket: 'geraeteverwaltung-4e8e6.firebasestorage.app',
     measurementId: 'G-ZEEVH2CG5V',
   );

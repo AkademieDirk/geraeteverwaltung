@@ -7,13 +7,13 @@ import 'geraeteaufnahme/geraeteaufnahme_screen.dart';
 
 class GeraeteListeScreen extends StatefulWidget {
   final List<Geraet> geraete;
-  final void Function(int, Geraet) onEdit;
-  final void Function(int) onDelete;
+  final Future<void> Function(Geraet) onUpdate;
+  final Future<void> Function(String) onDelete;
 
   const GeraeteListeScreen({
     Key? key,
     required this.geraete,
-    required this.onEdit,
+    required this.onUpdate,
     required this.onDelete,
   }) : super(key: key);
 
@@ -123,8 +123,9 @@ class _GeraeteListeScreenState extends State<GeraeteListeScreen> {
           pw.Text('Laufzeiten (in %):', style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)),
           _pdfRow('Bildeinheit (K/C/M/Y):', '${safeToString(g.laufzeitBildeinheitK)} / ${safeToString(g.laufzeitBildeinheitC)} / ${safeToString(g.laufzeitBildeinheitM)} / ${safeToString(g.laufzeitBildeinheitY)}'),
           _pdfRow('Entwickler (K/C/M/Y):', '${safeToString(g.laufzeitEntwicklerK)} / ${safeToString(g.laufzeitEntwicklerC)} / ${safeToString(g.laufzeitEntwicklerM)} / ${safeToString(g.laufzeitEntwicklerY)}'),
-          _pdfRow('Fixiereinheit:', safeToString(g.laufzeitFixiereinheit)),
-          _pdfRow('Transferbelt:', safeToString(g.laufzeitTransferbelt)),
+          // --- KORREKTUR HIER: Falsche Klammer '}' wurde durch ')' ersetzt ---
+          _pdfRow('Fixiereinheit:', '${safeToString(g.laufzeitFixiereinheit)} %'),
+          _pdfRow('Transferbelt:', '${safeToString(g.laufzeitTransferbelt)} %'),
 
           pw.Divider(height: 15),
           pw.Text('Testergebnisse und Zustand:', style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)),
@@ -188,7 +189,6 @@ class _GeraeteListeScreenState extends State<GeraeteListeScreen> {
               itemCount: _gefilterteGeraete.length,
               itemBuilder: (ctx, index) {
                 final g = _gefilterteGeraete[index];
-                final originalIndex = widget.geraete.indexOf(g);
 
                 return Card(
                   margin: const EdgeInsets.symmetric(vertical: 10),
@@ -212,19 +212,16 @@ class _GeraeteListeScreenState extends State<GeraeteListeScreen> {
                         IconButton(
                           icon: Icon(Icons.edit, color: Colors.blue),
                           tooltip: 'Bearbeiten',
-                          onPressed: () async {
-                            final result = await Navigator.push(
+                          onPressed: () {
+                            Navigator.push(
                               context,
                               MaterialPageRoute(
                                 builder: (_) => GeraeteAufnahmeScreen(
-                                  vorhandeneGeraete: widget.geraete,
                                   initialGeraet: g,
+                                  onSave: widget.onUpdate,
                                 ),
                               ),
                             );
-                            if (result != null && result is Geraet) {
-                              widget.onEdit(originalIndex, result);
-                            }
                           },
                         ),
                         IconButton(
@@ -249,7 +246,9 @@ class _GeraeteListeScreenState extends State<GeraeteListeScreen> {
                                 ],
                               ),
                             );
-                            if (sicher == true) widget.onDelete(originalIndex);
+                            if (sicher == true) {
+                              await widget.onDelete(g.id);
+                            }
                           },
                         ),
                         IconButton(
@@ -284,9 +283,9 @@ class _GeraeteListeScreenState extends State<GeraeteListeScreen> {
                       _row('Toner K / C / M / Y:', '${safeToString(g.tonerK)} / ${safeToString(g.tonerC)} / ${safeToString(g.tonerM)} / ${safeToString(g.tonerY)}'),
                       Divider(),
                       Text('Laufzeiten Bildeinheit (K/C/M/Y):', style: TextStyle(fontWeight: FontWeight.bold)),
-                      _row('', '${safeToString(g.laufzeitBildeinheitK)} / ${safeToString(g.laufzeitBildeinheitC)} / ${safeToString(g.laufzeitBildeinheitM)} / ${safeToString(g.laufzeitBildeinheitY)} %'),
+                      _row('', '${safeToString(g.laufzeitBildeinheitK)} / ${safeToString(g.laufzeitBildeinheitC)} / ${safeToString(g.laufzeitBildeinheitM)} / ${safeToString(g.laufzeitBildeinheitY)}'),
                       Text('Laufzeiten Entwickler (K/C/M/Y):', style: TextStyle(fontWeight: FontWeight.bold)),
-                      _row('', '${safeToString(g.laufzeitEntwicklerK)} / ${safeToString(g.laufzeitEntwicklerC)} / ${safeToString(g.laufzeitEntwicklerM)} / ${safeToString(g.laufzeitEntwicklerY)} %'),
+                      _row('', '${safeToString(g.laufzeitEntwicklerK)} / ${safeToString(g.laufzeitEntwicklerC)} / ${safeToString(g.laufzeitEntwicklerM)} / ${safeToString(g.laufzeitEntwicklerY)}'),
                       _row('Fixiereinheit:', '${safeToString(g.laufzeitFixiereinheit)} %'),
                       _row('Transferbelt:', '${safeToString(g.laufzeitTransferbelt)} %'),
                       Divider(),

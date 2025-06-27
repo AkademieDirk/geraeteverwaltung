@@ -1,42 +1,46 @@
 import 'package:flutter/material.dart';
 import 'geraeteaufnahme/geraeteaufnahme_screen.dart';
 import 'geraeteliste_screen.dart';
-import 'zubehoer_screen.dart';
 import 'aufbereitung_screen.dart';
+import 'lagerverwaltung_screen.dart';
 import 'historie_screen.dart';
 import '../models/geraet.dart';
 import '../models/ersatzteil.dart';
-import '../models/verbautes_teil.dart'; // Wichtig: Import des neuen Modells
+import '../models/verbautes_teil.dart';
 
-class AuswahlScreen extends StatefulWidget {
+class AuswahlScreen extends StatelessWidget {
   final List<Geraet> geraete;
   final List<Ersatzteil> ersatzteile;
-  // --- GEÄNDERT: Akzeptiert jetzt 'VerbautesTeil'-Objekte ---
   final Map<String, List<VerbautesTeil>> verbauteTeile;
 
-  final void Function(int, Geraet) onEdit;
-  final void Function(int) onDelete;
-  final void Function(Geraet) onAdd;
-  final void Function(List<Ersatzteil>) onErsatzteileChanged;
-  final void Function(String, Ersatzteil) onTeilVerbauen;
+  final Future<void> Function(Geraet) onAddGeraet;
+  final Future<void> Function(Geraet) onUpdateGeraet;
+  final Future<void> Function(String) onDeleteGeraet;
+
+  final Future<void> Function(Ersatzteil) onAddErsatzteil;
+  final Future<void> Function(Ersatzteil) onUpdateErsatzteil;
+  final Future<void> Function(String) onDeleteErsatzteil;
+
+  final Future<void> Function(String, Ersatzteil) onTeilVerbauen;
+  final Future<void> Function(String, VerbautesTeil) onDeleteVerbautesTeil;
+  final Future<void> Function(String, VerbautesTeil) onUpdateVerbautesTeil;
 
   const AuswahlScreen({
     Key? key,
     required this.geraete,
     required this.ersatzteile,
     required this.verbauteTeile,
-    required this.onEdit,
-    required this.onDelete,
-    required this.onAdd,
-    required this.onErsatzteileChanged,
+    required this.onAddGeraet,
+    required this.onUpdateGeraet,
+    required this.onDeleteGeraet,
+    required this.onAddErsatzteil,
+    required this.onUpdateErsatzteil,
+    required this.onDeleteErsatzteil,
     required this.onTeilVerbauen,
+    required this.onDeleteVerbautesTeil,
+    required this.onUpdateVerbautesTeil,
   }) : super(key: key);
 
-  @override
-  State<AuswahlScreen> createState() => _AuswahlScreenState();
-}
-
-class _AuswahlScreenState extends State<AuswahlScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -49,85 +53,45 @@ class _AuswahlScreenState extends State<AuswahlScreen> {
           mainAxisSpacing: 30,
           children: [
             _SelectionBox(
-              title: 'Geräteaufnahme',
-              icon: Icons.add_box,
-              color: Colors.blue,
-              onTap: () async {
-                final result = await Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => GeraeteAufnahmeScreen(
-                      vorhandeneGeraete: List.from(widget.geraete),
-                    ),
-                  ),
-                );
-                if (result != null) {
-                  widget.onAdd(result);
-                }
-              },
+              title: 'Geräteaufnahme', icon: Icons.add_box, color: Colors.blue,
+              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => GeraeteAufnahmeScreen(onSave: onAddGeraet))),
             ),
             _SelectionBox(
-              title: 'Geräteliste',
-              icon: Icons.list_alt,
-              color: Colors.green,
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => GeraeteListeScreen(
-                      geraete: widget.geraete,
-                      onEdit: widget.onEdit,
-                      onDelete: widget.onDelete,
-                    ),
-                  ),
-                );
-              },
+              title: 'Geräteliste', icon: Icons.list_alt, color: Colors.green,
+              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => GeraeteListeScreen(geraete: geraete, onUpdate: onUpdateGeraet, onDelete: onDeleteGeraet))),
             ),
             _SelectionBox(
-              title: 'Zubehör',
-              icon: Icons.inventory_2,
-              color: Colors.brown,
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => ZubehoerScreen(
-                      ersatzteile: widget.ersatzteile,
-                      onErsatzteileChanged: widget.onErsatzteileChanged,
-                    ),
-                  ),
-                );
-              },
-            ),
-            _SelectionBox(
-              title: 'Aufbereitung',
-              icon: Icons.build,
-              color: Colors.deepPurple,
+              title: 'Aufbereitung', icon: Icons.build, color: Colors.deepPurple,
               onTap: () {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
                     builder: (_) => AufbereitungScreen(
-                      alleGeraete: widget.geraete,
-                      alleErsatzteile: widget.ersatzteile,
-                      // GEÄNDERT: Übergibt die korrekten Daten
-                      verbauteTeile: widget.verbauteTeile,
-                      onTeilVerbauen: widget.onTeilVerbauen,
+                      alleGeraete: geraete,
+                      alleErsatzteile: ersatzteile,
+                      verbauteTeile: verbauteTeile,
+                      onTeilVerbauen: onTeilVerbauen,
+                      onDeleteVerbautesTeil: onDeleteVerbautesTeil,
+                      onUpdateVerbautesTeil: onUpdateVerbautesTeil,
                     ),
                   ),
                 );
               },
             ),
             _SelectionBox(
-              title: 'Historie',
-              icon: Icons.history,
-              color: Colors.teal,
+              title: 'Lagerverwaltung', icon: Icons.warehouse, color: Colors.brown,
+              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => LagerverwaltungScreen(ersatzteile: ersatzteile, onAdd: onAddErsatzteil, onUpdate: onUpdateErsatzteil, onDelete: onDeleteErsatzteil))),
+            ),
+            _SelectionBox(
+              title: 'Historie', icon: Icons.history, color: Colors.teal,
               onTap: () {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
                     builder: (_) => HistorieScreen(
-                      verbauteTeile: widget.verbauteTeile,
+                      verbauteTeile: verbauteTeile,
+                      onDelete: onDeleteVerbautesTeil,
+                      onUpdate: onUpdateVerbautesTeil,
                     ),
                   ),
                 );
@@ -146,13 +110,7 @@ class _SelectionBox extends StatelessWidget {
   final Color color;
   final VoidCallback onTap;
 
-  const _SelectionBox({
-    Key? key,
-    required this.title,
-    required this.icon,
-    required this.color,
-    required this.onTap,
-  }) : super(key: key);
+  const _SelectionBox({Key? key, required this.title, required this.icon, required this.color, required this.onTap}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -164,24 +122,13 @@ class _SelectionBox extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         child: Container(
           padding: const EdgeInsets.all(18),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: color, width: 2),
-          ),
+          decoration: BoxDecoration(borderRadius: BorderRadius.circular(16), border: Border.all(color: color, width: 2)),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Icon(icon, color: color, size: 46),
-              SizedBox(height: 14),
-              Text(
-                title,
-                style: TextStyle(
-                  color: color,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 18,
-                ),
-                textAlign: TextAlign.center,
-              ),
+              const SizedBox(height: 14),
+              Text(title, style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 18), textAlign: TextAlign.center),
             ],
           ),
         ),
