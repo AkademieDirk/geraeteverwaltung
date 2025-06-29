@@ -22,6 +22,22 @@ class LagerverwaltungScreen extends StatelessWidget {
     required this.onBookIn,
   }) : super(key: key);
 
+  // Hilfsfunktion für die Navigation, um Code-Wiederholung zu vermeiden
+  void _navigateToLagerAnsicht(BuildContext context, String lagerName) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ZubehoerScreen(
+          ersatzteile: ersatzteile,
+          onAdd: onAdd,
+          onUpdate: onUpdate,
+          onDelete: onDelete,
+          angezeigtesLager: lagerName,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -69,6 +85,25 @@ class LagerverwaltungScreen extends StatelessWidget {
                   onTransfer: onTransfer,
                 )));
               },
+            ),
+            // --- KORREKTUR: Lageransichten wieder hinzugefügt ---
+            _SelectionBox(
+              title: 'Hauptlager',
+              icon: Icons.home_work_outlined,
+              color: Colors.blueGrey,
+              onTap: () => _navigateToLagerAnsicht(context, 'Hauptlager'),
+            ),
+            _SelectionBox(
+              title: 'Fahrzeug Patrick',
+              icon: Icons.directions_car,
+              color: Colors.indigo,
+              onTap: () => _navigateToLagerAnsicht(context, 'Fahrzeug Patrick'),
+            ),
+            _SelectionBox(
+              title: 'Fahrzeug Melanie',
+              icon: Icons.directions_car,
+              color: Colors.pink.shade300,
+              onTap: () => _navigateToLagerAnsicht(context, 'Fahrzeug Melanie'),
             ),
           ],
         ),
