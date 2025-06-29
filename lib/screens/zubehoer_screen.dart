@@ -3,8 +3,6 @@ import '../models/ersatzteil.dart';
 
 class ZubehoerScreen extends StatefulWidget {
   final List<Ersatzteil> ersatzteile;
-  // Dieser Parameter ist optional. Ist er gesetzt, wird der Screen
-  // zur reinen Ansicht für ein spezifisches Lager.
   final String? angezeigtesLager;
   final Future<void> Function(Ersatzteil) onAdd;
   final Future<void> Function(Ersatzteil) onUpdate;
@@ -45,23 +43,20 @@ class _ZubehoerScreenState extends State<ZubehoerScreen> {
     super.dispose();
   }
 
-  void _neuesErsatzteilDialog({Ersatzteil? ersatzteil}) {
+  void _stammDatenDialog({Ersatzteil? ersatzteil}) {
     final isEdit = ersatzteil != null;
 
     final artikelController = TextEditingController(text: ersatzteil?.artikelnummer ?? '');
     final bezeichnungController = TextEditingController(text: ersatzteil?.bezeichnung ?? '');
+    final herstellerController = TextEditingController(text: ersatzteil?.hersteller ?? ''); // NEU
     final lieferantController = TextEditingController(text: ersatzteil?.lieferant ?? '');
     final preisController = TextEditingController(text: isEdit ? ersatzteil.preis.toStringAsFixed(2) : '');
     String ausgewaehlteKategorie = ersatzteil?.kategorie ?? _kategorien.first;
 
-    final hauptlagerController = TextEditingController(text: (ersatzteil?.lagerbestaende['Hauptlager'] ?? 0).toString());
-    final patrickController = TextEditingController(text: (ersatzteil?.lagerbestaende['Fahrzeug Patrick'] ?? 0).toString());
-    final melanieController = TextEditingController(text: (ersatzteil?.lagerbestaende['Fahrzeug Melanie'] ?? 0).toString());
-
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text(isEdit ? 'Ersatzteil bearbeiten' : 'Neues Ersatzteil'),
+        title: Text(isEdit ? 'Stammdaten bearbeiten' : 'Neues Ersatzteil anlegen'),
         content: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -74,17 +69,14 @@ class _ZubehoerScreenState extends State<ZubehoerScreen> {
               ),
               TextField(controller: artikelController, decoration: const InputDecoration(labelText: 'Artikelnummer')),
               TextField(controller: bezeichnungController, decoration: const InputDecoration(labelText: 'Bezeichnung')),
+              // --- NEU: Feld für den Hersteller ---
+              TextField(controller: herstellerController, decoration: const InputDecoration(labelText: 'Hersteller')),
               TextField(controller: lieferantController, decoration: const InputDecoration(labelText: 'Lieferant')),
               TextField(
                 controller: preisController,
                 decoration: const InputDecoration(labelText: 'Preis (z.B. 99.99)'),
                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
               ),
-              const SizedBox(height: 16),
-              const Text("Lagerbestände", style: TextStyle(fontWeight: FontWeight.bold)),
-              TextField(controller: hauptlagerController, decoration: const InputDecoration(labelText: 'Hauptlager'), keyboardType: TextInputType.number),
-              TextField(controller: patrickController, decoration: const InputDecoration(labelText: 'Fahrzeug Patrick'), keyboardType: TextInputType.number),
-              TextField(controller: melanieController, decoration: const InputDecoration(labelText: 'Fahrzeug Melanie'), keyboardType: TextInputType.number),
             ],
           ),
         ),
@@ -95,14 +87,9 @@ class _ZubehoerScreenState extends State<ZubehoerScreen> {
             onPressed: () async {
               final artikel = artikelController.text.trim();
               final bez = bezeichnungController.text.trim();
+              final herst = herstellerController.text.trim(); // NEU
               final lief = lieferantController.text.trim();
               final preis = double.tryParse(preisController.text.replaceAll(',', '.')) ?? 0.0;
-
-              final lagerbestaende = {
-                'Hauptlager': int.tryParse(hauptlagerController.text) ?? 0,
-                'Fahrzeug Patrick': int.tryParse(patrickController.text) ?? 0,
-                'Fahrzeug Melanie': int.tryParse(melanieController.text) ?? 0,
-              };
 
               if (artikel.isEmpty || bez.isEmpty || lief.isEmpty || preis <= 0) {
                 ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Bitte alle Felder korrekt ausfüllen!')));
@@ -113,10 +100,11 @@ class _ZubehoerScreenState extends State<ZubehoerScreen> {
                 id: isEdit ? ersatzteil.id : '',
                 artikelnummer: artikel,
                 bezeichnung: bez,
+                hersteller: herst, // NEU
                 lieferant: lief,
                 preis: preis,
                 kategorie: ausgewaehlteKategorie,
-                lagerbestaende: lagerbestaende,
+                lagerbestaende: isEdit ? ersatzteil.lagerbestaende : null,
               );
 
               if (isEdit) {
@@ -181,12 +169,11 @@ class _ZubehoerScreenState extends State<ZubehoerScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(isLagerAnsicht ? 'Bestand: ${widget.angezeigtesLager}' : 'Stammdaten & Bestand'),
-        // Der "Hinzufügen"-Button wird nur im Stammdaten-Modus angezeigt
         actions: isLagerAnsicht ? [] : [
           IconButton(
             icon: const Icon(Icons.add),
             tooltip: 'Neues Ersatzteil',
-            onPressed: () => _neuesErsatzteilDialog(),
+            onPressed: () => _stammDatenDialog(),
           )
         ],
       ),
@@ -210,7 +197,6 @@ class _ZubehoerScreenState extends State<ZubehoerScreen> {
                 : ListView(
               children: sortierteKategorien.map((kategorie) {
                 final teile = gruppiert[kategorie]!;
-
                 final int bestandInDieserKategorie = isLagerAnsicht
                     ? teile.fold(0, (sum, teil) => sum + (teil.lagerbestaende[widget.angezeigtesLager!] ?? 0))
                     : teile.fold(0, (sum, teil) => sum + teil.getGesamtbestand());
@@ -231,6 +217,8 @@ class _ZubehoerScreenState extends State<ZubehoerScreen> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
+                                // --- NEU: Hersteller wird hier angezeigt ---
+                                Text("Hersteller: ${teil.hersteller}"),
                                 if (isLagerAnsicht)
                                   _buildBestandRow(widget.angezeigtesLager!, teil.lagerbestaende[widget.angezeigtesLager!] ?? 0, isHighlighted: true)
                                 else ...[
@@ -246,7 +234,7 @@ class _ZubehoerScreenState extends State<ZubehoerScreen> {
                             children: [
                               Text('${teil.preis.toStringAsFixed(2)} €'),
                               if(!isLagerAnsicht)
-                                IconButton(icon: const Icon(Icons.edit, color: Colors.orange), tooltip: 'Bearbeiten', onPressed: () => _neuesErsatzteilDialog(ersatzteil: teil)),
+                                IconButton(icon: const Icon(Icons.edit, color: Colors.orange), tooltip: 'Bearbeiten', onPressed: () => _stammDatenDialog(ersatzteil: teil)),
                               if(!isLagerAnsicht)
                                 IconButton(icon: const Icon(Icons.delete, color: Colors.red), tooltip: 'Löschen', onPressed: () => _deleteErsatzteil(teil)),
                             ],
@@ -262,7 +250,7 @@ class _ZubehoerScreenState extends State<ZubehoerScreen> {
         ],
       ),
       floatingActionButton: isLagerAnsicht ? null : FloatingActionButton.extended(
-        onPressed: () => _neuesErsatzteilDialog(),
+        onPressed: () => _stammDatenDialog(),
         label: const Text('Hinzufügen'),
         icon: const Icon(Icons.add),
       ),

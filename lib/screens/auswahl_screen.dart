@@ -5,10 +5,10 @@ import 'aufbereitung_screen.dart';
 import 'lagerverwaltung_screen.dart';
 import 'historie_screen.dart';
 import 'service_screen.dart';
-import 'zubehoer_screen.dart';
 import '../models/geraet.dart';
 import '../models/ersatzteil.dart';
 import '../models/verbautes_teil.dart';
+import '../widgets/selection_box.dart'; // NEU: Import des ausgelagerten Widgets
 
 class AuswahlScreen extends StatelessWidget {
   final List<Geraet> geraete;
@@ -49,7 +49,6 @@ class AuswahlScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // --- Listen für die einzelnen Sektionen ---
     final List<Map<String, dynamic>> arbeitsablaeufe = [
       {'title': 'Geräteaufnahme', 'icon': Icons.add_box, 'color': Colors.blue, 'onTap': () => Navigator.push(context, MaterialPageRoute(builder: (_) => GeraeteAufnahmeScreen(onSave: onAddGeraet)))},
       {'title': 'Aufbereitung', 'icon': Icons.build, 'color': Colors.deepPurple, 'onTap': () => Navigator.push(context, MaterialPageRoute(builder: (_) => AufbereitungScreen(alleGeraete: geraete, alleErsatzteile: ersatzteile, verbauteTeile: verbauteTeile, onTeilVerbauen: onTeilVerbauen, onDeleteVerbautesTeil: onDeleteVerbautesTeil, onUpdateVerbautesTeil: onUpdateVerbautesTeil)))},
@@ -61,12 +60,8 @@ class AuswahlScreen extends StatelessWidget {
       {'title': 'Historie', 'icon': Icons.history, 'color': Colors.teal, 'onTap': () => Navigator.push(context, MaterialPageRoute(builder: (_) => HistorieScreen(verbauteTeile: verbauteTeile, onDelete: onDeleteVerbautesTeil, onUpdate: onUpdateVerbautesTeil)))},
     ];
 
-    // --- GEÄNDERT: "Verwaltung" enthält jetzt die einzelnen Lager ---
     final List<Map<String, dynamic>> verwaltung = [
-      {'title': 'Stammdaten & Umbuchung', 'icon': Icons.inventory_2, 'color': Colors.brown, 'onTap': () => Navigator.push(context, MaterialPageRoute(builder: (_) => LagerverwaltungScreen(ersatzteile: ersatzteile, onAdd: onAddErsatzteil, onUpdate: onUpdateErsatzteil, onDelete: onDeleteErsatzteil, onTransfer: onTransfer, onBookIn: onBookIn)))},
-      {'title': 'Hauptlager', 'icon': Icons.home_work_outlined, 'color': Colors.blueGrey, 'onTap': () => Navigator.push(context, MaterialPageRoute(builder: (_) => ZubehoerScreen(ersatzteile: ersatzteile, angezeigtesLager: 'Hauptlager', onAdd: onAddErsatzteil, onUpdate: onUpdateErsatzteil, onDelete: onDeleteErsatzteil)))},
-      {'title': 'Fahrzeug Patrick', 'icon': Icons.directions_car, 'color': Colors.indigo, 'onTap': () => Navigator.push(context, MaterialPageRoute(builder: (_) => ZubehoerScreen(ersatzteile: ersatzteile, angezeigtesLager: 'Fahrzeug Patrick', onAdd: onAddErsatzteil, onUpdate: onUpdateErsatzteil, onDelete: onDeleteErsatzteil)))},
-      {'title': 'Fahrzeug Melanie', 'icon': Icons.directions_car, 'color': Colors.pink.shade300, 'onTap': () => Navigator.push(context, MaterialPageRoute(builder: (_) => ZubehoerScreen(ersatzteile: ersatzteile, angezeigtesLager: 'Fahrzeug Melanie', onAdd: onAddErsatzteil, onUpdate: onUpdateErsatzteil, onDelete: onDeleteErsatzteil)))},
+      {'title': 'Lagerverwaltung', 'icon': Icons.warehouse, 'color': Colors.brown, 'onTap': () => Navigator.push(context, MaterialPageRoute(builder: (_) => LagerverwaltungScreen(ersatzteile: ersatzteile, onAdd: onAddErsatzteil, onUpdate: onUpdateErsatzteil, onDelete: onDeleteErsatzteil, onTransfer: onTransfer, onBookIn: onBookIn)))},
     ];
 
     return DefaultTabController(
@@ -109,46 +104,13 @@ class AuswahlScreen extends StatelessWidget {
           itemCount: items.length,
           itemBuilder: (ctx, index) {
             final item = items[index];
-            return _SelectionBox(
+            return SelectionBox( // GEÄNDERT: Verwendet das ausgelagerte Widget
               title: item['title'],
               icon: item['icon'],
               color: item['color'],
               onTap: item['onTap'],
             );
           },
-        ),
-      ),
-    );
-  }
-}
-
-class _SelectionBox extends StatelessWidget {
-  final String title;
-  final IconData icon;
-  final Color color;
-  final VoidCallback onTap;
-
-  const _SelectionBox({Key? key, required this.title, required this.icon, required this.color, required this.onTap}) : super(key: key);
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: color.withOpacity(0.08),
-      borderRadius: BorderRadius.circular(16),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
-        child: Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(borderRadius: BorderRadius.circular(16), border: Border.all(color: color, width: 2)),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon, color: color, size: 36),
-              const SizedBox(height: 8),
-              Text(title, style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 14), textAlign: TextAlign.center),
-            ],
-          ),
         ),
       ),
     );

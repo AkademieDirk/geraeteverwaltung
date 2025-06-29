@@ -4,6 +4,7 @@ class Ersatzteil {
   String id;
   String artikelnummer;
   String bezeichnung;
+  String hersteller; // NEU
   String lieferant;
   double preis;
   String kategorie;
@@ -13,6 +14,7 @@ class Ersatzteil {
     this.id = '',
     required this.artikelnummer,
     required this.bezeichnung,
+    required this.hersteller, // NEU
     required this.lieferant,
     required this.preis,
     required this.kategorie,
@@ -27,6 +29,7 @@ class Ersatzteil {
     return {
       'artikelnummer': artikelnummer,
       'bezeichnung': bezeichnung,
+      'hersteller': hersteller, // NEU
       'lieferant': lieferant,
       'preis': preis,
       'kategorie': kategorie,
@@ -40,6 +43,7 @@ class Ersatzteil {
       id: doc.id,
       artikelnummer: data['artikelnummer'] ?? '',
       bezeichnung: data['bezeichnung'] ?? '',
+      hersteller: data['hersteller'] ?? '', // NEU
       lieferant: data['lieferant'] ?? '',
       preis: (data['preis'] as num?)?.toDouble() ?? 0.0,
       kategorie: data['kategorie'] ?? '',
@@ -52,6 +56,7 @@ class Ersatzteil {
       id: map['id'] ?? '',
       artikelnummer: map['artikelnummer'] ?? '',
       bezeichnung: map['bezeichnung'] ?? '',
+      hersteller: map['hersteller'] ?? '', // NEU
       lieferant: map['lieferant'] ?? '',
       preis: (map['preis'] as num?)?.toDouble() ?? 0.0,
       kategorie: map['kategorie'] ?? '',

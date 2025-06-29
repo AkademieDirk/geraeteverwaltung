@@ -12,15 +12,19 @@ class FirestoreService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
   final Uuid _uuid = Uuid();
 
-  // ... (bestehende Geräte-, Ersatzteil- und Historien-Operationen) ...
+  // --- Geräte-Operationen ---
   Stream<List<Geraet>> getGeraete() => _db.collection('geraete').snapshots().map((snapshot) => snapshot.docs.map((doc) => Geraet.fromFirestore(doc)).toList());
   Future<void> addGeraet(Geraet geraet) => _db.collection('geraete').add(geraet.toJson());
   Future<void> updateGeraet(Geraet geraet) => _db.collection('geraete').doc(geraet.id).update(geraet.toJson());
   Future<void> deleteGeraet(String geraetId) => _db.collection('geraete').doc(geraetId).delete();
+
+  // --- Ersatzteil-Operationen ---
   Stream<List<Ersatzteil>> getErsatzteile() => _db.collection('ersatzteile').snapshots().map((snapshot) => snapshot.docs.map((doc) => Ersatzteil.fromFirestore(doc)).toList());
   Future<void> addErsatzteil(Ersatzteil ersatzteil) => _db.collection('ersatzteile').add(ersatzteil.toJson());
   Future<void> updateErsatzteil(Ersatzteil ersatzteil) => _db.collection('ersatzteile').doc(ersatzteil.id).update(ersatzteil.toJson());
   Future<void> deleteErsatzteil(String ersatzteilId) => _db.collection('ersatzteile').doc(ersatzteilId).delete();
+
+  // --- Historien-Operationen ---
   Stream<Map<String, List<VerbautesTeil>>> getVerbauteTeile() {
     return _db.collection('historie').snapshots().map((snapshot) {
       Map<String, List<VerbautesTeil>> historie = {};
@@ -33,20 +37,32 @@ class FirestoreService {
       return historie;
     });
   }
+
   Future<void> addVerbautesTeil(String seriennummer, Ersatzteil teil, String lager) async {
     final ersatzteilRef = _db.collection('ersatzteile').doc(teil.id);
     final historieRef = _db.collection('historie').doc(seriennummer);
+
     return _db.runTransaction((transaction) async {
       final ersatzteilSnapshot = await transaction.get(ersatzteilRef);
       if (!ersatzteilSnapshot.exists) throw Exception("Ersatzteil nicht gefunden!");
+
       final ersatzteilDaten = Ersatzteil.fromFirestore(ersatzteilSnapshot);
       int aktuellerBestand = ersatzteilDaten.lagerbestaende[lager] ?? 0;
       if (aktuellerBestand <= 0) throw Exception("Kein Bestand in Lager '$lager'.");
+
       transaction.update(ersatzteilRef, {'lagerbestaende.$lager': FieldValue.increment(-1)});
-      final verbautesTeil = VerbautesTeil(id: _uuid.v4(), ersatzteil: teil, installationsDatum: DateTime.now(), tatsaechlicherPreis: teil.preis, herkunftslager: lager);
+
+      final verbautesTeil = VerbautesTeil(
+        id: _uuid.v4(),
+        ersatzteil: teil,
+        installationsDatum: DateTime.now(),
+        tatsaechlicherPreis: teil.preis,
+        herkunftslager: lager,
+      );
       transaction.set(historieRef, {'teile': FieldValue.arrayUnion([verbautesTeil.toJson()])}, SetOptions(merge: true));
     });
   }
+
   Future<void> updateVerbautesTeil(String seriennummer, VerbautesTeil geandertesTeil) async {
     final docRef = _db.collection('historie').doc(seriennummer);
     final doc = await docRef.get();
@@ -60,28 +76,50 @@ class FirestoreService {
       }
     }
   }
+
   Future<void> deleteVerbautesTeil(String seriennummer, VerbautesTeil teil) async {
     final historieRef = _db.collection('historie').doc(seriennummer);
-    final ersatzteilRef = _db.collection('ersatzteile').doc(teil.ersatzteil.id);
-    return _db.runTransaction((transaction) async {
-      transaction.update(ersatzteilRef, {'lagerbestaende.${teil.herkunftslager}': FieldValue.increment(1)});
-      final doc = await transaction.get(historieRef);
+    if (teil.ersatzteil.id.isNotEmpty) {
+      final ersatzteilRef = _db.collection('ersatzteile').doc(teil.ersatzteil.id);
+
+      return _db.runTransaction((transaction) async {
+        transaction.update(ersatzteilRef, {'lagerbestaende.${teil.herkunftslager}': FieldValue.increment(1)});
+
+        final doc = await transaction.get(historieRef);
+        if (doc.exists) {
+          final teileData = doc.data()!['teile'] as List<dynamic>? ?? [];
+          final List<Map<String, dynamic>> teileMapList = teileData.map((e) => e as Map<String, dynamic>).toList();
+          teileMapList.removeWhere((itemMap) => itemMap['id'] == teil.id);
+          transaction.update(historieRef, {'teile': teileMapList});
+        }
+      });
+    } else {
+      final doc = await historieRef.get();
       if (doc.exists) {
         final teileData = doc.data()!['teile'] as List<dynamic>? ?? [];
-        final List<VerbautesTeil> teileListe = teileData.map((data) => VerbautesTeil.fromMap(data)).toList();
-        teileListe.removeWhere((item) => item.id == teil.id);
-        await transaction.update(historieRef, {'teile': teileListe.map((t) => t.toJson()).toList()});
+        final List<Map<String, dynamic>> teileMapList = teileData.map((e) => e as Map<String, dynamic>).toList();
+        teileMapList.removeWhere((itemMap) => itemMap['id'] == teil.id);
+        await historieRef.update({'teile': teileMapList});
       }
-    });
+    }
   }
+
   Future<void> transferErsatzteil(Ersatzteil teil, String vonLager, String nachLager, int anzahl) async {
     final ersatzteilRef = _db.collection('ersatzteile').doc(teil.id);
+
     return _db.runTransaction((transaction) async {
       final ersatzteilSnapshot = await transaction.get(ersatzteilRef);
-      if (!ersatzteilSnapshot.exists) throw Exception("Ersatzteil nicht mehr gefunden.");
+      if (!ersatzteilSnapshot.exists) {
+        throw Exception("Ersatzteil nicht mehr gefunden.");
+      }
+
       final ersatzteilDaten = Ersatzteil.fromFirestore(ersatzteilSnapshot);
       int aktuellerVonBestand = ersatzteilDaten.lagerbestaende[vonLager] ?? 0;
-      if (aktuellerVonBestand < anzahl) throw Exception("Nicht genügend Bestand im Lager '$vonLager'.");
+
+      if (aktuellerVonBestand < anzahl) {
+        throw Exception("Nicht genügend Bestand im Lager '$vonLager'.");
+      }
+
       transaction.update(ersatzteilRef, {
         'lagerbestaende.$vonLager': FieldValue.increment(-anzahl),
         'lagerbestaende.$nachLager': FieldValue.increment(anzahl),
@@ -89,7 +127,6 @@ class FirestoreService {
     });
   }
 
-  // --- NEU: Funktion für den Wareneingang ---
   Future<void> bookInErsatzteil(Ersatzteil teil, String lager, int anzahl) {
     final ersatzteilRef = _db.collection('ersatzteile').doc(teil.id);
     return ersatzteilRef.update({
@@ -123,21 +160,35 @@ class _MyHomePageState extends State<MyHomePage> {
     return StreamBuilder<List<Geraet>>(
       stream: _firestoreService.getGeraete(),
       builder: (context, geraeteSnapshot) {
-        if (geraeteSnapshot.connectionState == ConnectionState.waiting) return const Scaffold(body: Center(child: CircularProgressIndicator()));
-        if (geraeteSnapshot.hasError) return Scaffold(body: Center(child: Text('Fehler beim Laden der Geräte: ${geraeteSnapshot.error}')));
+        // --- ANFANG DER KORREKTUR ---
+        // Wartet, bis alle Streams mindestens einmal Daten geliefert haben.
+        if (geraeteSnapshot.connectionState == ConnectionState.waiting) {
+          return const Scaffold(body: Center(child: CircularProgressIndicator()));
+        }
+        if (geraeteSnapshot.hasError) {
+          return Scaffold(body: Center(child: Text('Fehler beim Laden der Geräte: ${geraeteSnapshot.error}')));
+        }
+
+        // Stellt sicher, dass die Listen nicht null sind, auch wenn die DB leer ist.
         final geraete = geraeteSnapshot.data ?? [];
+        // --- ENDE DER KORREKTUR ---
+
         return StreamBuilder<List<Ersatzteil>>(
           stream: _firestoreService.getErsatzteile(),
           builder: (context, ersatzteileSnapshot) {
             if (ersatzteileSnapshot.connectionState == ConnectionState.waiting) return const Scaffold(body: Center(child: CircularProgressIndicator()));
             if (ersatzteileSnapshot.hasError) return Scaffold(body: Center(child: Text('Fehler beim Laden der Ersatzteile: ${ersatzteileSnapshot.error}')));
+
             final ersatzteile = ersatzteileSnapshot.data ?? [];
+
             return StreamBuilder<Map<String, List<VerbautesTeil>>>(
               stream: _firestoreService.getVerbauteTeile(),
               builder: (context, historieSnapshot) {
                 if (historieSnapshot.connectionState == ConnectionState.waiting) return const Scaffold(body: Center(child: CircularProgressIndicator()));
                 if (historieSnapshot.hasError) return Scaffold(body: Center(child: Text('Fehler beim Laden der Historie: ${historieSnapshot.error}')));
+
                 final verbauteTeile = historieSnapshot.data ?? {};
+
                 return AuswahlScreen(
                   geraete: geraete,
                   ersatzteile: ersatzteile,
@@ -152,7 +203,6 @@ class _MyHomePageState extends State<MyHomePage> {
                   onDeleteVerbautesTeil: _firestoreService.deleteVerbautesTeil,
                   onUpdateVerbautesTeil: _firestoreService.updateVerbautesTeil,
                   onTransfer: _firestoreService.transferErsatzteil,
-                  // NEU: Übergabe der neuen Funktion
                   onBookIn: _firestoreService.bookInErsatzteil,
                 );
               },
