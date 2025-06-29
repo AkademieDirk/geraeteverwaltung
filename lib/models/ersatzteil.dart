@@ -7,6 +7,7 @@ class Ersatzteil {
   String lieferant;
   double preis;
   String kategorie;
+  Map<String, int> lagerbestaende;
 
   Ersatzteil({
     this.id = '',
@@ -15,7 +16,12 @@ class Ersatzteil {
     required this.lieferant,
     required this.preis,
     required this.kategorie,
-  });
+    Map<String, int>? lagerbestaende,
+  }) : this.lagerbestaende = lagerbestaende ?? {'Hauptlager': 0, 'Fahrzeug Patrick': 0, 'Fahrzeug Melanie': 0};
+
+  int getGesamtbestand() {
+    return lagerbestaende.values.fold(0, (sum, item) => sum + item);
+  }
 
   Map<String, dynamic> toJson() {
     return {
@@ -24,6 +30,7 @@ class Ersatzteil {
       'lieferant': lieferant,
       'preis': preis,
       'kategorie': kategorie,
+      'lagerbestaende': lagerbestaende,
     };
   }
 
@@ -36,11 +43,10 @@ class Ersatzteil {
       lieferant: data['lieferant'] ?? '',
       preis: (data['preis'] as num?)?.toDouble() ?? 0.0,
       kategorie: data['kategorie'] ?? '',
+      lagerbestaende: Map<String, int>.from(data['lagerbestaende'] ?? {}),
     );
   }
 
-  // --- NEU: Diese Methode hat gefehlt ---
-  // Erstellt ein Ersatzteil-Objekt aus einer einfachen Map.
   static Ersatzteil fromMap(Map<String, dynamic> map) {
     return Ersatzteil(
       id: map['id'] ?? '',
@@ -49,6 +55,7 @@ class Ersatzteil {
       lieferant: map['lieferant'] ?? '',
       preis: (map['preis'] as num?)?.toDouble() ?? 0.0,
       kategorie: map['kategorie'] ?? '',
+      lagerbestaende: Map<String, int>.from(map['lagerbestaende'] ?? {}),
     );
   }
 }

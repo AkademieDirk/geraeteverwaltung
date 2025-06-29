@@ -9,6 +9,7 @@ class Geraet {
   String iOption;
   String pdfTyp;
   String durchsuchbar;
+  String ocr; // NEU: Feld für die OCR-Auswahl
   String originaleinzugTyp;
   String originaleinzugSN;
   String unterschrankTyp;
@@ -16,7 +17,7 @@ class Geraet {
   String finisher;
   String finisherSN;
   String fax;
-  String faxSN; // NEU: Feld für die Fax-Seriennummer
+  String faxSN;
   String bemerkung;
   String zaehlerGesamt;
   String zaehlerSW;
@@ -53,6 +54,7 @@ class Geraet {
     this.iOption = '',
     this.pdfTyp = '',
     this.durchsuchbar = '',
+    this.ocr = '', // NEU
     this.originaleinzugTyp = '',
     this.originaleinzugSN = '',
     this.unterschrankTyp = '',
@@ -60,7 +62,7 @@ class Geraet {
     this.finisher = '',
     this.finisherSN = '',
     this.fax = '',
-    this.faxSN = '', // NEU
+    this.faxSN = '',
     this.bemerkung = '',
     this.zaehlerGesamt = '',
     this.zaehlerSW = '',
@@ -98,6 +100,7 @@ class Geraet {
       'iOption': iOption,
       'pdfTyp': pdfTyp,
       'durchsuchbar': durchsuchbar,
+      'ocr': ocr, // NEU
       'originaleinzugTyp': originaleinzugTyp,
       'originaleinzugSN': originaleinzugSN,
       'unterschrankTyp': unterschrankTyp,
@@ -105,7 +108,7 @@ class Geraet {
       'finisher': finisher,
       'finisherSN': finisherSN,
       'fax': fax,
-      'faxSN': faxSN, // NEU
+      'faxSN': faxSN,
       'bemerkung': bemerkung,
       'zaehlerGesamt': zaehlerGesamt,
       'zaehlerSW': zaehlerSW,
@@ -146,6 +149,7 @@ class Geraet {
       iOption: data['iOption'] ?? '',
       pdfTyp: data['pdfTyp'] ?? '',
       durchsuchbar: data['durchsuchbar'] ?? '',
+      ocr: data['ocr'] ?? '', // NEU
       originaleinzugTyp: data['originaleinzugTyp'] ?? '',
       originaleinzugSN: data['originaleinzugSN'] ?? '',
       unterschrankTyp: data['unterschrankTyp'] ?? '',
@@ -153,7 +157,7 @@ class Geraet {
       finisher: data['finisher'] ?? '',
       finisherSN: data['finisherSN'] ?? '',
       fax: data['fax'] ?? '',
-      faxSN: data['faxSN'] ?? '', // NEU
+      faxSN: data['faxSN'] ?? '',
       bemerkung: data['bemerkung'] ?? '',
       zaehlerGesamt: data['zaehlerGesamt'] ?? '',
       zaehlerSW: data['zaehlerSW'] ?? '',

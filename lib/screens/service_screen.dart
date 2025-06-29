@@ -4,7 +4,8 @@ import '../models/ersatzteil.dart';
 import '../models/verbautes_teil.dart';
 import 'historie_screen.dart';
 
-class AufbereitungScreen extends StatefulWidget {
+// Dieser Screen ist eine Kopie des Aufbereitung-Screens für Service-Einsätze.
+class ServiceScreen extends StatefulWidget {
   final List<Geraet> alleGeraete;
   final List<Ersatzteil> alleErsatzteile;
   final Map<String, List<VerbautesTeil>> verbauteTeile;
@@ -12,7 +13,7 @@ class AufbereitungScreen extends StatefulWidget {
   final Future<void> Function(String, VerbautesTeil) onDeleteVerbautesTeil;
   final Future<void> Function(String, VerbautesTeil) onUpdateVerbautesTeil;
 
-  const AufbereitungScreen({
+  const ServiceScreen({
     Key? key,
     required this.alleGeraete,
     required this.alleErsatzteile,
@@ -23,10 +24,10 @@ class AufbereitungScreen extends StatefulWidget {
   }) : super(key: key);
 
   @override
-  State<AufbereitungScreen> createState() => _AufbereitungScreenState();
+  State<ServiceScreen> createState() => _ServiceScreenState();
 }
 
-class _AufbereitungScreenState extends State<AufbereitungScreen> {
+class _ServiceScreenState extends State<ServiceScreen> {
   final TextEditingController _geraeteNummerController = TextEditingController();
   Geraet? _gefundenesGeraet;
 
@@ -36,7 +37,7 @@ class _AufbereitungScreenState extends State<AufbereitungScreen> {
 
   List<Ersatzteil> _gefilterteErsatzteile = [];
   Ersatzteil? _selectedErsatzteil;
-  String? _selectedLager;
+  String? _selectedLager; // NEU: Ausgewähltes Lager
 
   @override
   void dispose() {
@@ -115,7 +116,7 @@ class _AufbereitungScreenState extends State<AufbereitungScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Aufbereitung'),
+        title: const Text('Service-Einsatz'), // Titel geändert
         actions: [
           IconButton(
             icon: const Icon(Icons.history),
@@ -169,6 +170,8 @@ class _AufbereitungScreenState extends State<AufbereitungScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      // Hier beginnt die Logik für die Ersatzteil-Auswahl
+                      // ... (Dropdowns für Kategorie und Teil, wie im AufbereitungScreen) ...
                       DropdownButtonFormField<String>(
                         value: _selectedPartType,
                         decoration: const InputDecoration(labelText: 'Art des Ersatzteils', border: OutlineInputBorder()),

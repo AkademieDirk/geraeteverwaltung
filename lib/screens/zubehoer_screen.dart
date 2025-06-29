@@ -3,7 +3,9 @@ import '../models/ersatzteil.dart';
 
 class ZubehoerScreen extends StatefulWidget {
   final List<Ersatzteil> ersatzteile;
-  // Nimmt die Firestore-Funktionen entgegen
+  // Dieser Parameter ist optional. Ist er gesetzt, wird der Screen
+  // zur reinen Ansicht für ein spezifisches Lager.
+  final String? angezeigtesLager;
   final Future<void> Function(Ersatzteil) onAdd;
   final Future<void> Function(Ersatzteil) onUpdate;
   final Future<void> Function(String) onDelete;
@@ -11,6 +13,7 @@ class ZubehoerScreen extends StatefulWidget {
   const ZubehoerScreen({
     Key? key,
     required this.ersatzteile,
+    this.angezeigtesLager,
     required this.onAdd,
     required this.onUpdate,
     required this.onDelete,
@@ -21,7 +24,6 @@ class ZubehoerScreen extends StatefulWidget {
 }
 
 class _ZubehoerScreenState extends State<ZubehoerScreen> {
-  // --- NEU: Controller und State für die Suche ---
   final TextEditingController _searchController = TextEditingController();
   String _searchTerm = '';
 
@@ -46,11 +48,15 @@ class _ZubehoerScreenState extends State<ZubehoerScreen> {
   void _neuesErsatzteilDialog({Ersatzteil? ersatzteil}) {
     final isEdit = ersatzteil != null;
 
-    final _artikelController = TextEditingController(text: ersatzteil?.artikelnummer ?? '');
-    final _bezeichnungController = TextEditingController(text: ersatzteil?.bezeichnung ?? '');
-    final _lieferantController = TextEditingController(text: ersatzteil?.lieferant ?? '');
-    final _preisController = TextEditingController(text: isEdit ? ersatzteil.preis.toStringAsFixed(2) : '');
-    String _ausgewaehlteKategorie = ersatzteil?.kategorie ?? _kategorien.first;
+    final artikelController = TextEditingController(text: ersatzteil?.artikelnummer ?? '');
+    final bezeichnungController = TextEditingController(text: ersatzteil?.bezeichnung ?? '');
+    final lieferantController = TextEditingController(text: ersatzteil?.lieferant ?? '');
+    final preisController = TextEditingController(text: isEdit ? ersatzteil.preis.toStringAsFixed(2) : '');
+    String ausgewaehlteKategorie = ersatzteil?.kategorie ?? _kategorien.first;
+
+    final hauptlagerController = TextEditingController(text: (ersatzteil?.lagerbestaende['Hauptlager'] ?? 0).toString());
+    final patrickController = TextEditingController(text: (ersatzteil?.lagerbestaende['Fahrzeug Patrick'] ?? 0).toString());
+    final melanieController = TextEditingController(text: (ersatzteil?.lagerbestaende['Fahrzeug Melanie'] ?? 0).toString());
 
     showDialog(
       context: context,
@@ -61,21 +67,24 @@ class _ZubehoerScreenState extends State<ZubehoerScreen> {
             mainAxisSize: MainAxisSize.min,
             children: [
               DropdownButtonFormField<String>(
-                value: _ausgewaehlteKategorie,
+                value: ausgewaehlteKategorie,
                 items: _kategorien.map((k) => DropdownMenuItem(value: k, child: Text(k))).toList(),
                 decoration: const InputDecoration(labelText: 'Kategorie'),
-                onChanged: (val) {
-                  if (val != null) _ausgewaehlteKategorie = val;
-                },
+                onChanged: (val) { if (val != null) ausgewaehlteKategorie = val; },
               ),
-              TextField(controller: _artikelController, decoration: const InputDecoration(labelText: 'Artikelnummer')),
-              TextField(controller: _bezeichnungController, decoration: const InputDecoration(labelText: 'Bezeichnung')),
-              TextField(controller: _lieferantController, decoration: const InputDecoration(labelText: 'Lieferant')),
+              TextField(controller: artikelController, decoration: const InputDecoration(labelText: 'Artikelnummer')),
+              TextField(controller: bezeichnungController, decoration: const InputDecoration(labelText: 'Bezeichnung')),
+              TextField(controller: lieferantController, decoration: const InputDecoration(labelText: 'Lieferant')),
               TextField(
-                controller: _preisController,
+                controller: preisController,
                 decoration: const InputDecoration(labelText: 'Preis (z.B. 99.99)'),
                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
               ),
+              const SizedBox(height: 16),
+              const Text("Lagerbestände", style: TextStyle(fontWeight: FontWeight.bold)),
+              TextField(controller: hauptlagerController, decoration: const InputDecoration(labelText: 'Hauptlager'), keyboardType: TextInputType.number),
+              TextField(controller: patrickController, decoration: const InputDecoration(labelText: 'Fahrzeug Patrick'), keyboardType: TextInputType.number),
+              TextField(controller: melanieController, decoration: const InputDecoration(labelText: 'Fahrzeug Melanie'), keyboardType: TextInputType.number),
             ],
           ),
         ),
@@ -84,10 +93,16 @@ class _ZubehoerScreenState extends State<ZubehoerScreen> {
           ElevatedButton(
             child: Text(isEdit ? 'Speichern' : 'Hinzufügen'),
             onPressed: () async {
-              final artikel = _artikelController.text.trim();
-              final bez = _bezeichnungController.text.trim();
-              final lief = _lieferantController.text.trim();
-              final preis = double.tryParse(_preisController.text.replaceAll(',', '.')) ?? 0.0;
+              final artikel = artikelController.text.trim();
+              final bez = bezeichnungController.text.trim();
+              final lief = lieferantController.text.trim();
+              final preis = double.tryParse(preisController.text.replaceAll(',', '.')) ?? 0.0;
+
+              final lagerbestaende = {
+                'Hauptlager': int.tryParse(hauptlagerController.text) ?? 0,
+                'Fahrzeug Patrick': int.tryParse(patrickController.text) ?? 0,
+                'Fahrzeug Melanie': int.tryParse(melanieController.text) ?? 0,
+              };
 
               if (artikel.isEmpty || bez.isEmpty || lief.isEmpty || preis <= 0) {
                 ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Bitte alle Felder korrekt ausfüllen!')));
@@ -100,7 +115,8 @@ class _ZubehoerScreenState extends State<ZubehoerScreen> {
                 bezeichnung: bez,
                 lieferant: lief,
                 preis: preis,
-                kategorie: _ausgewaehlteKategorie,
+                kategorie: ausgewaehlteKategorie,
+                lagerbestaende: lagerbestaende,
               );
 
               if (isEdit) {
@@ -136,8 +152,10 @@ class _ZubehoerScreenState extends State<ZubehoerScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // --- NEU: Filterlogik ---
-    final List<Ersatzteil> gefilterteListe;
+    final bool isLagerAnsicht = widget.angezeigtesLager != null;
+
+    List<Ersatzteil> gefilterteListe;
+
     if (_searchTerm.isEmpty) {
       gefilterteListe = widget.ersatzteile;
     } else {
@@ -148,17 +166,23 @@ class _ZubehoerScreenState extends State<ZubehoerScreen> {
       }).toList();
     }
 
+    if(isLagerAnsicht) {
+      gefilterteListe = gefilterteListe.where((teil) {
+        return (teil.lagerbestaende[widget.angezeigtesLager!] ?? 0) > 0;
+      }).toList();
+    }
+
     Map<String, List<Ersatzteil>> gruppiert = {};
     for (var et in gefilterteListe) {
       gruppiert.putIfAbsent(et.kategorie, () => []).add(et);
     }
-
     final sortierteKategorien = gruppiert.keys.toList()..sort();
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Ersatzteile verwalten'),
-        actions: [
+        title: Text(isLagerAnsicht ? 'Bestand: ${widget.angezeigtesLager}' : 'Stammdaten & Bestand'),
+        // Der "Hinzufügen"-Button wird nur im Stammdaten-Modus angezeigt
+        actions: isLagerAnsicht ? [] : [
           IconButton(
             icon: const Icon(Icons.add),
             tooltip: 'Neues Ersatzteil',
@@ -166,10 +190,8 @@ class _ZubehoerScreenState extends State<ZubehoerScreen> {
           )
         ],
       ),
-      // --- GEÄNDERT: Body ist jetzt eine Spalte ---
       body: Column(
         children: [
-          // --- NEU: Suchfeld ---
           Padding(
             padding: const EdgeInsets.all(16.0),
             child: TextField(
@@ -177,58 +199,61 @@ class _ZubehoerScreenState extends State<ZubehoerScreen> {
               decoration: InputDecoration(
                 labelText: 'Suche nach Bezeichnung oder Artikelnummer',
                 prefixIcon: const Icon(Icons.search),
-                suffixIcon: _searchTerm.isNotEmpty
-                    ? IconButton(
-                  icon: const Icon(Icons.clear),
-                  onPressed: () => _searchController.clear(),
-                )
-                    : null,
+                suffixIcon: _searchTerm.isNotEmpty ? IconButton(icon: const Icon(Icons.clear), onPressed: () => _searchController.clear()) : null,
                 border: const OutlineInputBorder(),
               ),
             ),
           ),
-          // --- NEU: Liste ist jetzt in einem Expanded-Widget ---
           Expanded(
             child: gruppiert.isEmpty
                 ? const Center(child: Text('Keine passenden Ersatzteile gefunden.'))
                 : ListView(
               children: sortierteKategorien.map((kategorie) {
                 final teile = gruppiert[kategorie]!;
+
+                final int bestandInDieserKategorie = isLagerAnsicht
+                    ? teile.fold(0, (sum, teil) => sum + (teil.lagerbestaende[widget.angezeigtesLager!] ?? 0))
+                    : teile.fold(0, (sum, teil) => sum + teil.getGesamtbestand());
+
                 return Card(
                   margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
                   child: ExpansionTile(
-                    title: Text(
-                      '$kategorie (${teile.length})',
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-                    ),
-                    children: teile.map((teil) => Card(
-                      elevation: 0,
-                      margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 12),
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          side: BorderSide(color: Colors.grey.shade200)
-                      ),
-                      child: ListTile(
-                        title: Text('${teil.bezeichnung} (${teil.artikelnummer})'),
-                        subtitle: Text('Lieferant: ${teil.lieferant}'),
-                        trailing: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text('${teil.preis.toStringAsFixed(2)} €'),
-                            IconButton(
-                              icon: const Icon(Icons.edit, color: Colors.orange),
-                              tooltip: 'Bearbeiten',
-                              onPressed: () => _neuesErsatzteilDialog(ersatzteil: teil),
+                    title: Text('$kategorie ($bestandInDieserKategorie Stk.)', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                    children: teile.map((teil) {
+                      return Card(
+                        elevation: 0,
+                        margin: const EdgeInsets.fromLTRB(12, 6, 12, 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8), side: BorderSide(color: Colors.grey.shade200)),
+                        child: ListTile(
+                          title: Text('${teil.bezeichnung} (${teil.artikelnummer})'),
+                          subtitle: Padding(
+                            padding: const EdgeInsets.only(top: 8.0),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                if (isLagerAnsicht)
+                                  _buildBestandRow(widget.angezeigtesLager!, teil.lagerbestaende[widget.angezeigtesLager!] ?? 0, isHighlighted: true)
+                                else ...[
+                                  _buildBestandRow('Hauptlager', teil.lagerbestaende['Hauptlager'] ?? 0),
+                                  _buildBestandRow('Fahrzeug Patrick', teil.lagerbestaende['Fahrzeug Patrick'] ?? 0),
+                                  _buildBestandRow('Fahrzeug Melanie', teil.lagerbestaende['Fahrzeug Melanie'] ?? 0),
+                                ]
+                              ],
                             ),
-                            IconButton(
-                              icon: const Icon(Icons.delete, color: Colors.red),
-                              tooltip: 'Löschen',
-                              onPressed: () => _deleteErsatzteil(teil),
-                            ),
-                          ],
+                          ),
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text('${teil.preis.toStringAsFixed(2)} €'),
+                              if(!isLagerAnsicht)
+                                IconButton(icon: const Icon(Icons.edit, color: Colors.orange), tooltip: 'Bearbeiten', onPressed: () => _neuesErsatzteilDialog(ersatzteil: teil)),
+                              if(!isLagerAnsicht)
+                                IconButton(icon: const Icon(Icons.delete, color: Colors.red), tooltip: 'Löschen', onPressed: () => _deleteErsatzteil(teil)),
+                            ],
+                          ),
                         ),
-                      ),
-                    )).toList(),
+                      );
+                    }).toList(),
                   ),
                 );
               }).toList(),
@@ -236,10 +261,29 @@ class _ZubehoerScreenState extends State<ZubehoerScreen> {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
+      floatingActionButton: isLagerAnsicht ? null : FloatingActionButton.extended(
         onPressed: () => _neuesErsatzteilDialog(),
         label: const Text('Hinzufügen'),
         icon: const Icon(Icons.add),
+      ),
+    );
+  }
+
+  Widget _buildBestandRow(String lager, int bestand, {bool isHighlighted = false}) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4.0),
+      child: Row(
+        children: [
+          Text('$lager: ', style: TextStyle(color: Colors.grey.shade700)),
+          Text(
+            '$bestand Stk.',
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 15,
+              color: isHighlighted || bestand > 0 ? Colors.black87 : Colors.red.shade700,
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -20,12 +20,10 @@ class HistorieScreen extends StatefulWidget {
 
 class _HistorieScreenState extends State<HistorieScreen> {
   final TextEditingController _seriennummerController = TextEditingController();
-
-  // --- GEÄNDERT: State-Variablen für die neue Suchlogik ---
-  List<String> _suchergebnisse = []; // Liste der passenden Seriennummern
-  List<VerbautesTeil> _gefundeneTeile = []; // Angezeigte Teile für die ausgewählte SN
+  List<VerbautesTeil> _gefundeneTeile = [];
   double _gesamtkosten = 0.0;
   String _angezeigteSeriennummer = '';
+  List<String> _suchergebnisse = [];
 
   @override
   void dispose() {
@@ -33,11 +31,9 @@ class _HistorieScreenState extends State<HistorieScreen> {
     super.dispose();
   }
 
-  /// --- GEÄNDERT: Neue Suchlogik, die eine Liste von Treffern zurückgibt ---
   void _sucheHistorie() {
     final suchbegriff = _seriennummerController.text.trim().toLowerCase();
 
-    // Setzt die Anzeige zurück, bevor eine neue Suche gestartet wird.
     setState(() {
       _gefundeneTeile = [];
       _angezeigteSeriennummer = '';
@@ -49,7 +45,6 @@ class _HistorieScreenState extends State<HistorieScreen> {
       return;
     }
 
-    // Findet alle passenden Seriennummern
     final treffer = widget.verbauteTeile.keys
         .where((seriennummer) => seriennummer.toLowerCase().contains(suchbegriff))
         .toList();
@@ -59,17 +54,14 @@ class _HistorieScreenState extends State<HistorieScreen> {
         const SnackBar(content: Text('Für diesen Suchbegriff wurde keine Historie gefunden.')),
       );
     } else if (treffer.length == 1) {
-      // Wenn es nur einen Treffer gibt, zeige ihn direkt an.
       _zeigeHistorieFuer(treffer.first);
     } else {
-      // Wenn es mehrere Treffer gibt, zeige die Auswahl an.
       setState(() {
         _suchergebnisse = treffer;
       });
     }
   }
 
-  /// --- NEU: Funktion, die die Details für eine ausgewählte Seriennummer lädt ---
   void _zeigeHistorieFuer(String seriennummer) {
     final teile = widget.verbauteTeile[seriennummer]!;
     final summe = teile.fold(0.0, (total, verbautesTeil) => total + verbautesTeil.tatsaechlicherPreis);
@@ -78,24 +70,79 @@ class _HistorieScreenState extends State<HistorieScreen> {
       _gefundeneTeile = teile;
       _gesamtkosten = summe;
       _angezeigteSeriennummer = seriennummer;
-      _suchergebnisse = []; // Verbirgt die Auswahlliste
-      _seriennummerController.text = seriennummer; // Aktualisiert das Suchfeld mit der vollen SN
+      _suchergebnisse = [];
+      _seriennummerController.text = seriennummer;
     });
   }
 
+  // --- GEÄNDERT: Fügt try-catch für besseres Feedback hinzu ---
   void _loescheVerbautesTeil(VerbautesTeil teil) async {
-    // ... (unverändert)
-    final sicher = await showDialog<bool>(context: context, builder: (ctx) => AlertDialog(title: const Text('Eintrag löschen?'), content: Text('Soll der Eintrag "${teil.ersatzteil.bezeichnung}" wirklich aus der Historie gelöscht werden?'), actions: [TextButton(child: const Text('Abbrechen'), onPressed: () => Navigator.pop(ctx, false)), TextButton(child: Text('Löschen', style: TextStyle(color: Colors.red)), onPressed: () => Navigator.pop(ctx, true))]));
-    if (sicher == true) {
-      await widget.onDelete(_angezeigteSeriennummer, teil);
+    final sicher = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Eintrag löschen?'),
+        content: Text('Soll der Eintrag "${teil.ersatzteil.bezeichnung}" wirklich aus der Historie gelöscht werden?'),
+        actions: [
+          TextButton(child: const Text('Abbrechen'), onPressed: () => Navigator.pop(ctx, false)),
+          TextButton(child: Text('Löschen', style: TextStyle(color: Colors.red)), onPressed: () => Navigator.pop(ctx, true)),
+        ],
+      ),
+    );
+
+    if (sicher == true && mounted) {
+      try {
+        await widget.onDelete(_angezeigteSeriennummer, teil);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Eintrag erfolgreich gelöscht.'), backgroundColor: Colors.green),
+        );
+        // Die UI wird automatisch durch den StreamBuilder aktualisiert.
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Fehler beim Löschen: ${e.toString()}'), backgroundColor: Colors.red),
+        );
+      }
     }
   }
 
   void _bearbeiteVerbautesTeilDialog(VerbautesTeil teil) {
-    // ... (unverändert)
     final preisController = TextEditingController(text: teil.tatsaechlicherPreis.toStringAsFixed(2));
     final bemerkungController = TextEditingController(text: teil.bemerkung);
-    showDialog(context: context, builder: (context) => AlertDialog(title: Text('Eintrag bearbeiten'), content: Column(mainAxisSize: MainAxisSize.min, children: [Text(teil.ersatzteil.bezeichnung, style: TextStyle(fontWeight: FontWeight.bold)), SizedBox(height: 16), TextField(controller: preisController, decoration: InputDecoration(labelText: 'Tatsächlicher Preis', border: OutlineInputBorder(), suffixText: '€'), keyboardType: TextInputType.numberWithOptions(decimal: true)), SizedBox(height: 16), TextField(controller: bemerkungController, decoration: InputDecoration(labelText: 'Bemerkung (z.B. Abweichung)', border: OutlineInputBorder()), maxLines: 2)]), actions: [TextButton(onPressed: () => Navigator.pop(context), child: Text('Abbrechen')), ElevatedButton(onPressed: () async { final neuerPreis = double.tryParse(preisController.text.replaceAll(',', '.')) ?? teil.tatsaechlicherPreis; final geandertesTeil = VerbautesTeil(id: teil.id, ersatzteil: teil.ersatzteil, installationsDatum: teil.installationsDatum, tatsaechlicherPreis: neuerPreis, bemerkung: bemerkungController.text.trim()); await widget.onUpdate(_angezeigteSeriennummer, geandertesTeil); Navigator.pop(context); }, child: Text('Speichern'))]));
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Eintrag bearbeiten'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(teil.ersatzteil.bezeichnung, style: TextStyle(fontWeight: FontWeight.bold)),
+            SizedBox(height: 16),
+            TextField(controller: preisController, decoration: InputDecoration(labelText: 'Tatsächlicher Preis', border: OutlineInputBorder(), suffixText: '€'), keyboardType: TextInputType.numberWithOptions(decimal: true)),
+            SizedBox(height: 16),
+            TextField(controller: bemerkungController, decoration: InputDecoration(labelText: 'Bemerkung (z.B. Abweichung)', border: OutlineInputBorder()), maxLines: 2),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: Text('Abbrechen')),
+          ElevatedButton(
+            onPressed: () async {
+              final neuerPreis = double.tryParse(preisController.text.replaceAll(',', '.')) ?? teil.tatsaechlicherPreis;
+              final geandertesTeil = VerbautesTeil(
+                id: teil.id,
+                ersatzteil: teil.ersatzteil,
+                installationsDatum: teil.installationsDatum,
+                tatsaechlicherPreis: neuerPreis,
+                bemerkung: bemerkungController.text.trim(),
+                herkunftslager: teil.herkunftslager,
+              );
+              await widget.onUpdate(_angezeigteSeriennummer, geandertesTeil);
+              Navigator.pop(context);
+            },
+            child: Text('Speichern'),
+          )
+        ],
+      ),
+    );
   }
 
   @override
@@ -120,14 +167,12 @@ class _HistorieScreenState extends State<HistorieScreen> {
               ),
             ),
             const SizedBox(height: 12),
-
-            // --- NEU: Zeigt entweder die Suchergebnisse oder die Detailansicht an ---
             Expanded(
               child: AnimatedSwitcher(
                 duration: const Duration(milliseconds: 300),
                 child: _suchergebnisse.isNotEmpty
-                    ? _buildSuchergebnisListe() // Zeigt die Liste der gefundenen SN
-                    : _buildHistorienAnsicht(), // Zeigt die Details für eine SN
+                    ? _buildSuchergebnisListe()
+                    : _buildHistorienAnsicht(),
               ),
             ),
           ],
@@ -136,7 +181,6 @@ class _HistorieScreenState extends State<HistorieScreen> {
     );
   }
 
-  /// --- NEU: Widget zur Anzeige der Suchergebnis-Liste ---
   Widget _buildSuchergebnisListe() {
     return Column(
       key: const ValueKey('ergebnisliste'),
@@ -144,10 +188,7 @@ class _HistorieScreenState extends State<HistorieScreen> {
       children: [
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
-          child: Text(
-            '${_suchergebnisse.length} Treffer gefunden. Bitte auswählen:',
-            style: Theme.of(context).textTheme.titleMedium,
-          ),
+          child: Text('${_suchergebnisse.length} Treffer gefunden. Bitte auswählen:', style: Theme.of(context).textTheme.titleMedium),
         ),
         Expanded(
           child: ListView.builder(
@@ -156,12 +197,7 @@ class _HistorieScreenState extends State<HistorieScreen> {
               final seriennummer = _suchergebnisse[index];
               return Card(
                 margin: const EdgeInsets.symmetric(vertical: 4),
-                child: ListTile(
-                  title: Text(seriennummer),
-                  leading: const Icon(Icons.receipt_long),
-                  trailing: const Icon(Icons.arrow_forward_ios),
-                  onTap: () => _zeigeHistorieFuer(seriennummer),
-                ),
+                child: ListTile(title: Text(seriennummer), leading: const Icon(Icons.receipt_long), trailing: const Icon(Icons.arrow_forward_ios), onTap: () => _zeigeHistorieFuer(seriennummer)),
               );
             },
           ),
@@ -170,17 +206,21 @@ class _HistorieScreenState extends State<HistorieScreen> {
     );
   }
 
-  /// --- NEU: Widget zur Anzeige der ausgewählten Historie ---
   Widget _buildHistorienAnsicht() {
-    if (_gefundeneTeile.isEmpty) {
+    if (_angezeigteSeriennummer.isEmpty) {
       return const Center(
         key: ValueKey('leere_ansicht'),
         child: Text('Bitte eine Seriennummer eingeben, um die Historie anzuzeigen.'),
       );
     }
-
+    if (_gefundeneTeile.isEmpty) {
+      return Center(
+        key: ValueKey('keine_teile'),
+        child: Text('Für die Seriennummer $_angezeigteSeriennummer wurden keine Teile verbaut.'),
+      );
+    }
     return Column(
-      key: ValueKey(_angezeigteSeriennummer), // Wichtig für den AnimatedSwitcher
+      key: ValueKey(_angezeigteSeriennummer),
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Card(
@@ -217,6 +257,7 @@ class _HistorieScreenState extends State<HistorieScreen> {
                     ListTile(title: Text('${verbautes.tatsaechlicherPreis.toStringAsFixed(2)} €'), subtitle: const Text('Tatsächlicher Preis'), leading: const Icon(Icons.euro_symbol)),
                     if (verbautes.bemerkung.isNotEmpty) ListTile(title: Text(verbautes.bemerkung), subtitle: const Text('Bemerkung'), leading: const Icon(Icons.notes)),
                     ListTile(title: Text(teil.artikelnummer), subtitle: const Text('Artikelnummer'), leading: const Icon(Icons.qr_code)),
+                    ListTile(title: Text('aus: ${verbautes.herkunftslager}'), subtitle: const Text('Herkunftslager'), leading: const Icon(Icons.warehouse)),
                   ],
                 ),
               );

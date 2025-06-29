@@ -18,11 +18,8 @@ class GeraeteAufnahmeScreen extends StatefulWidget {
 class _GeraeteAufnahmeScreenState extends State<GeraeteAufnahmeScreen> {
   final _formKey = GlobalKey<FormState>();
 
-  // --- ANFANG DER ÄNDERUNG ---
-  // Die Liste der Modelle wurde basierend auf Ihrer Vorlage aktualisiert.
   final List<String> _modellOptionen = [
     'Nichts ausgewählt',
-    // A3 Farbsysteme
     'bizhub C250i', 'bizhub C251i', 'bizhub C257i',
     'bizhub C300i', 'bizhub C301i',
     'bizhub C360i', 'bizhub C361i',
@@ -31,33 +28,27 @@ class _GeraeteAufnahmeScreenState extends State<GeraeteAufnahmeScreen> {
     'bizhub C458', 'bizhub C558', 'bizhub C658',
     'bizhub C224e', 'bizhub C284e', 'bizhub C364e',
     'bizhub C454e', 'bizhub C554e',
-    // A4 Farbsysteme
     'bizhub C3301i', 'bizhub C3321i',
     'bizhub C3351i',
     'bizhub C4051i',
     'bizhub C3350i', 'bizhub C3851',
     'bizhub C3351', 'bizhub C3851FS',
-    // A3 S/W-Systeme
     'bizhub 227', 'bizhub 287', 'bizhub 367',
     'bizhub 301i', 'bizhub 361i',
     'bizhub 451i', 'bizhub 551i', 'bizhub 651i', 'bizhub 751i',
-    // A4 S/W-Systeme
     'bizhub 4000i', 'bizhub 4051i', 'bizhub 4701i', 'bizhub 4751i',
     'bizhub 4052', 'bizhub 4702p', 'bizhub 4752',
-    'andere' // Option für andere Modelle
+    'andere'
   ];
-  // --- ENDE DER ÄNDERUNG ---
 
-  // Dropdown-Optionen
   final List<String> _mitarbeiterOptionen = ['Nichts ausgewählt', 'Patrick Heidrich', 'Carsten Sobota', 'Melanie Toffel', 'Dirk Kraft'];
   final List<String> _jaNeinOptionen = ['Nichts ausgewählt', 'Ja', 'Nein'];
-  final List<String> _pdfTypen = ['Nichts ausgewählt', 'A', 'B'];
+  final List<String> _pdfTypen = ['Nichts ausgewählt', 'A / B'];
   final List<int> _prozentSchritte = List.generate(11, (i) => i * 10);
   final List<String> _originaleinzugTypOptionen = ['Nichts ausgewählt', 'Kein', 'DF-714', 'DF-715', 'DF-632', 'DF-633', 'Sonstiges'];
   final List<String> _unterschrankTypOptionen = ['Nichts ausgewählt', 'Kein', 'PC-116', 'PC-216', 'PC-416', 'Sonstiges'];
   final List<String> _finisherOptionen = ['Nichts ausgewählt', 'Kein', 'FS-533', 'FS-539', 'FS-532', 'Sonstiges'];
 
-  // Controller und Felder
   final _nummerController = TextEditingController();
   final _seriennummerController = TextEditingController();
   String _selectedMitarbeiter = 'Nichts ausgewählt';
@@ -65,6 +56,7 @@ class _GeraeteAufnahmeScreenState extends State<GeraeteAufnahmeScreen> {
   String _selectedIOption = 'Nichts ausgewählt';
   String _selectedPdfTyp = 'Nichts ausgewählt';
   String _selectedDurchsuchbar = 'Nichts ausgewählt';
+  String _selectedOcr = 'Nichts ausgewählt';
   String _selectedOriginaleinzugTyp = 'Nichts ausgewählt';
   final _originaleinzugSNController = TextEditingController();
   String _selectedUnterschrankTyp = 'Nichts ausgewählt';
@@ -106,19 +98,26 @@ class _GeraeteAufnahmeScreenState extends State<GeraeteAufnahmeScreen> {
     if (widget.initialGeraet != null) {
       final g = widget.initialGeraet!;
       _nummerController.text = g.nummer;
-      _selectedModell = g.modell.isNotEmpty ? g.modell : 'Nichts ausgewählt';
+
+      // --- ANFANG DER KORREKTUR ---
+      // Prüft, ob der gespeicherte Wert in der Optionsliste vorhanden ist.
+      // Wenn nicht, wird ein sicherer Standardwert gesetzt, um einen Crash zu vermeiden.
+      _selectedModell = _modellOptionen.contains(g.modell) ? g.modell : 'Nichts ausgewählt';
       _seriennummerController.text = g.seriennummer;
-      _selectedMitarbeiter = g.mitarbeiter.isNotEmpty ? g.mitarbeiter : 'Nichts ausgewählt';
-      _selectedIOption = g.iOption.isNotEmpty ? g.iOption : 'Nichts ausgewählt';
-      _selectedPdfTyp = g.pdfTyp.isNotEmpty ? g.pdfTyp : 'Nichts ausgewählt';
-      _selectedDurchsuchbar = g.durchsuchbar.isNotEmpty ? g.durchsuchbar : 'Nichts ausgewählt';
-      _selectedOriginaleinzugTyp = g.originaleinzugTyp.isNotEmpty ? g.originaleinzugTyp : 'Nichts ausgewählt';
+      _selectedMitarbeiter = _mitarbeiterOptionen.contains(g.mitarbeiter) ? g.mitarbeiter : 'Nichts ausgewählt';
+      _selectedIOption = _jaNeinOptionen.contains(g.iOption) ? g.iOption : 'Nichts ausgewählt';
+      _selectedPdfTyp = _pdfTypen.contains(g.pdfTyp) ? g.pdfTyp : 'Nichts ausgewählt';
+      _selectedDurchsuchbar = _jaNeinOptionen.contains(g.durchsuchbar) ? g.durchsuchbar : 'Nichts ausgewählt';
+      _selectedOcr = _jaNeinOptionen.contains(g.ocr) ? g.ocr : 'Nichts ausgewählt';
+      _selectedOriginaleinzugTyp = _originaleinzugTypOptionen.contains(g.originaleinzugTyp) ? g.originaleinzugTyp : 'Nichts ausgewählt';
       _originaleinzugSNController.text = g.originaleinzugSN;
-      _selectedUnterschrankTyp = g.unterschrankTyp.isNotEmpty ? g.unterschrankTyp : 'Nichts ausgewählt';
+      _selectedUnterschrankTyp = _unterschrankTypOptionen.contains(g.unterschrankTyp) ? g.unterschrankTyp : 'Nichts ausgewählt';
       _unterschrankSNController.text = g.unterschrankSN;
-      _selectedFinisher = g.finisher.isNotEmpty ? g.finisher : 'Nichts ausgewählt';
+      _selectedFinisher = _finisherOptionen.contains(g.finisher) ? g.finisher : 'Nichts ausgewählt';
       _finisherSNController.text = g.finisherSN;
-      _selectedFax = g.fax.isNotEmpty ? g.fax : 'Nichts ausgewählt';
+      _selectedFax = _jaNeinOptionen.contains(g.fax) ? g.fax : 'Nichts ausgewählt';
+      // --- ENDE DER KORREKTUR ---
+
       _faxSNController.text = g.faxSN;
       _zaehlerGesamtController.text = g.zaehlerGesamt;
       _zaehlerSWController.text = g.zaehlerSW;
@@ -190,6 +189,7 @@ class _GeraeteAufnahmeScreenState extends State<GeraeteAufnahmeScreen> {
       iOption: clean(_selectedIOption),
       pdfTyp: clean(_selectedPdfTyp),
       durchsuchbar: clean(_selectedDurchsuchbar),
+      ocr: clean(_selectedOcr),
       originaleinzugTyp: clean(_selectedOriginaleinzugTyp),
       originaleinzugSN: _originaleinzugSNController.text.trim(),
       unterschrankTyp: clean(_selectedUnterschrankTyp),
@@ -270,6 +270,12 @@ class _GeraeteAufnahmeScreenState extends State<GeraeteAufnahmeScreen> {
               DropdownButtonFormField<String>(value: _selectedIOption, decoration: const InputDecoration(labelText: 'I-Option'), items: _jaNeinOptionen.map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(), onChanged: (val) => setState(() => _selectedIOption = val ?? 'Nichts ausgewählt')),
               DropdownButtonFormField<String>(value: _selectedPdfTyp, decoration: const InputDecoration(labelText: 'PDF Typ'), items: _pdfTypen.map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(), onChanged: (val) => setState(() => _selectedPdfTyp = val ?? 'Nichts ausgewählt')),
               DropdownButtonFormField<String>(value: _selectedDurchsuchbar, decoration: const InputDecoration(labelText: 'Durchsuchbar'), items: _jaNeinOptionen.map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(), onChanged: (val) => setState(() => _selectedDurchsuchbar = val ?? 'Nichts ausgewählt')),
+              DropdownButtonFormField<String>(
+                value: _selectedOcr,
+                decoration: const InputDecoration(labelText: 'OCR'),
+                items: _jaNeinOptionen.map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
+                onChanged: (val) => setState(() => _selectedOcr = val ?? 'Nichts ausgewählt'),
+              ),
               const SizedBox(height: 22),
               const Text('Zubehör:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
               Row(children: [Expanded(child: DropdownButtonFormField<String>(value: _selectedOriginaleinzugTyp, decoration: const InputDecoration(labelText: 'Originaleinzug Typ'), items: _originaleinzugTypOptionen.map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(), onChanged: (val) => setState(() => _selectedOriginaleinzugTyp = val ?? 'Nichts ausgewählt'))), const SizedBox(width: 8), Expanded(child: TextFormField(controller: _originaleinzugSNController, decoration: const InputDecoration(labelText: 'Seriennummer')))]),
