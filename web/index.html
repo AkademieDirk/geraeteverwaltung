@@ -1,42 +1,42 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <base href="/">
+  <!-- Wenn deine App nicht im Root-Verzeichnis läuft, passe `<base href="/">` entsprechend an -->
+  <base href="$FLUTTER_BASE_HREF">
+
   <meta charset="UTF-8">
-  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
-  <title>Ihre App</title>
+  <meta http-equiv="X-UA-Compatible" content="IE=Edge">
+  <meta name="description" content="A new Flutter project.">
+
+  <!-- iOS meta-Tags & Icons -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-title" content="your_app_name">
+  <link rel="apple-touch-icon" href="icons/Icon-192.png">
+
+  <!-- Favicon & Manifest -->
+  <link rel="icon" type="image/png" href="favicon.png"/>
+  <title>Your App Title</title>
   <link rel="manifest" href="manifest.json">
+
+  <script>
+    // Von Flutter build eingefügt – NICHT bearbeiten
+    var serviceWorkerVersion = null;
+  </script>
+  <!-- Bootstrap-Script, das Flutter initialisiert -->
+  <script src="flutter.js" defer></script>
 </head>
 <body>
-
-<!-- HIER FÜGEN WIR GLEICH DIE FIREBASE-SKRIPTE EIN -->
-<!-- Firebase SDKs -->
-<script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
-
-<!-- Firebase Initialisierung -->
 <script>
-  const firebaseConfig = {
-    apiKey: "1:733804575642:web:116d36f8fa064cc2361823",
-    authDomain: "geraeteverwaltung-4e8e6.firebaseapp.com",
-    projectId: "geraeteverwaltung-4e8e6",
-    storageBucket: "geraeteverwaltung-4e8e6.firebasestorage.app",
-    messagingSenderId: "ihr-sender-id",
-    appId: "1:733804575642:web:116d36f8fa064cc2361823"
-  };
-  firebase.initializeApp(firebaseConfig);
-</script>
-
-<script src="flutter.js" defer></script>
-<script>
-  window.addEventListener('load', function(ev) {
-    _flutter.loader.load({
+  window.addEventListener('load', function (ev) {
+    _flutter.loader.loadEntrypoint({
       serviceWorker: {
-        serviceWorkerVersion: null,
+        serviceWorkerVersion: serviceWorkerVersion,
       }
-    }).then(function(engine) {
-      engine.runApp();
+    }).then(function(engineInitializer) {
+      return engineInitializer.initializeEngine();
+    }).then(function(appRunner) {
+      return appRunner.runApp();
     });
   });
 </script>
