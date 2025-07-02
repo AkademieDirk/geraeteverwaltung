@@ -4,7 +4,6 @@ import '../models/ersatzteil.dart';
 import '../models/verbautes_teil.dart';
 import 'historie_screen.dart';
 
-// Dieser Screen ist eine Kopie des Aufbereitung-Screens für Service-Einsätze.
 class ServiceScreen extends StatefulWidget {
   final List<Geraet> alleGeraete;
   final List<Ersatzteil> alleErsatzteile;
@@ -28,7 +27,7 @@ class ServiceScreen extends StatefulWidget {
 }
 
 class _ServiceScreenState extends State<ServiceScreen> {
-  final TextEditingController _geraeteNummerController = TextEditingController();
+  final TextEditingController _seriennummerController = TextEditingController();
   Geraet? _gefundenesGeraet;
 
   String? _selectedPartType;
@@ -37,49 +36,57 @@ class _ServiceScreenState extends State<ServiceScreen> {
 
   List<Ersatzteil> _gefilterteErsatzteile = [];
   Ersatzteil? _selectedErsatzteil;
-  String? _selectedLager; // NEU: Ausgewähltes Lager
+  String? _selectedLager;
 
   @override
   void dispose() {
-    _geraeteNummerController.dispose();
+    _seriennummerController.dispose();
     _articleNumberController.dispose();
     super.dispose();
   }
 
+  // --- KORREKTUR: Sucht jetzt nach Teilen der Seriennummer (case-insensitive) ---
   void _sucheGeraet() {
-    final eingegebeneNummer = _geraeteNummerController.text.trim();
-    if (eingegebeneNummer.isEmpty) {
+    final suchbegriff = _seriennummerController.text.trim().toLowerCase();
+    if (suchbegriff.isEmpty) {
       setState(() { _gefundenesGeraet = null; });
       return;
     }
     try {
-      final geraet = widget.alleGeraete.firstWhere((g) => g.nummer.toString() == eingegebeneNummer);
-      setState(() { _gefundenesGeraet = geraet; });
+      final geraet = widget.alleGeraete.firstWhere(
+              (g) => g.seriennummer.toLowerCase().contains(suchbegriff)
+      );
+      setState(() {
+        _gefundenesGeraet = geraet;
+        _seriennummerController.text = geraet.seriennummer; // Füllt das Feld mit der vollen SN
+      });
     } catch (e) {
       setState(() { _gefundenesGeraet = null; });
-      _showSnackbar(context, 'Kein Gerät mit dieser Nummer gefunden.');
+      _showSnackbar(context, 'Kein Gerät für "${_seriennummerController.text}" gefunden.');
     }
   }
 
+  // --- KORREKTUR: Sucht jetzt nach Teilen der Artikelnummer (case-insensitive) ---
   void _sucheArtikel() {
-    final artikelnummer = _articleNumberController.text.trim();
-    if (artikelnummer.isEmpty) {
+    final suchbegriff = _articleNumberController.text.trim().toLowerCase();
+    if (suchbegriff.isEmpty) {
       setState(() => _foundArticle = null);
       return;
     }
     try {
       final ersatzteil = widget.alleErsatzteile.firstWhere(
-            (teil) => teil.artikelnummer == artikelnummer,
+            (teil) => teil.artikelnummer.toLowerCase().contains(suchbegriff),
       );
       setState(() {
         _foundArticle = ersatzteil;
+        _articleNumberController.text = ersatzteil.artikelnummer; // Füllt das Feld mit der vollen Art.-Nr.
         _selectedPartType = ersatzteil.kategorie;
         _gefilterteErsatzteile = widget.alleErsatzteile.where((t) => t.kategorie == _selectedPartType).toList();
         _selectedErsatzteil = ersatzteil;
       });
     } catch (e) {
       setState(() { _foundArticle = null; });
-      _showSnackbar(context, 'Artikelnummer nicht im Zubehör gefunden.');
+      _showSnackbar(context, 'Kein Ersatzteil für "${_articleNumberController.text}" gefunden.');
     }
   }
 
@@ -116,7 +123,7 @@ class _ServiceScreenState extends State<ServiceScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Service-Einsatz'), // Titel geändert
+        title: const Text('Service-Einsatz'),
         actions: [
           IconButton(
             icon: const Icon(Icons.history),
@@ -152,9 +159,29 @@ class _ServiceScreenState extends State<ServiceScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      TextField(controller: _geraeteNummerController, keyboardType: TextInputType.number, decoration: InputDecoration(labelText: 'Gerätenummer eingeben', border: OutlineInputBorder(), suffixIcon: IconButton(icon: Icon(Icons.search), onPressed: _sucheGeraet, tooltip: 'Suchen')), onSubmitted: (_) => _sucheGeraet()),
+                      TextField(
+                        controller: _seriennummerController,
+                        decoration: InputDecoration(
+                          labelText: 'Seriennummer eingeben',
+                          border: OutlineInputBorder(),
+                          suffixIcon: IconButton(icon: Icon(Icons.search), onPressed: _sucheGeraet, tooltip: 'Suchen'),
+                        ),
+                        onSubmitted: (_) => _sucheGeraet(),
+                      ),
                       const SizedBox(height: 16),
-                      if (_gefundenesGeraet != null) RichText(text: TextSpan(style: Theme.of(context).textTheme.titleMedium, children: [TextSpan(text: 'Seriennummer: '), TextSpan(text: _gefundenesGeraet!.seriennummer, style: TextStyle(fontWeight: FontWeight.bold))])) else Text('Bitte geben Sie eine gültige Gerätenummer ein.', style: TextStyle(color: Colors.grey.shade600)),
+                      if (_gefundenesGeraet != null)
+                        RichText(
+                          text: TextSpan(
+                            style: Theme.of(context).textTheme.titleMedium,
+                            children: [
+                              TextSpan(text: 'Modell: '),
+                              TextSpan(text: _gefundenesGeraet!.modell, style: TextStyle(fontWeight: FontWeight.bold)),
+                              TextSpan(text: ' (Nr: ${_gefundenesGeraet!.nummer})'),
+                            ],
+                          ),
+                        )
+                      else
+                        Text('Bitte geben Sie eine Seriennummer ein.', style: TextStyle(color: Colors.grey.shade600)),
                     ],
                   ),
                 ),
@@ -170,8 +197,6 @@ class _ServiceScreenState extends State<ServiceScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Hier beginnt die Logik für die Ersatzteil-Auswahl
-                      // ... (Dropdowns für Kategorie und Teil, wie im AufbereitungScreen) ...
                       DropdownButtonFormField<String>(
                         value: _selectedPartType,
                         decoration: const InputDecoration(labelText: 'Art des Ersatzteils', border: OutlineInputBorder()),

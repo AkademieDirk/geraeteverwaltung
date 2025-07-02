@@ -1,44 +1,25 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <!-- Wenn deine App nicht im Root-Verzeichnis läuft, passe `<base href="/">` entsprechend an -->
   <base href="$FLUTTER_BASE_HREF">
 
   <meta charset="UTF-8">
   <meta http-equiv="X-UA-Compatible" content="IE=Edge">
   <meta name="description" content="A new Flutter project.">
 
-  <!-- iOS meta-Tags & Icons -->
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black">
   <meta name="apple-mobile-web-app-title" content="your_app_name">
   <link rel="apple-touch-icon" href="icons/Icon-192.png">
 
-  <!-- Favicon & Manifest -->
   <link rel="icon" type="image/png" href="favicon.png"/>
   <title>Your App Title</title>
-  <link rel="manifest" href="manifest.json">
 
-  <script>
-    // Von Flutter build eingefügt – NICHT bearbeiten
-    var serviceWorkerVersion = null;
-  </script>
-  <!-- Bootstrap-Script, das Flutter initialisiert -->
-  <script src="flutter.js" defer></script>
+  <script src="flutter_service_worker.js" defer></script>
 </head>
 <body>
-<script>
-  window.addEventListener('load', function (ev) {
-    _flutter.loader.loadEntrypoint({
-      serviceWorker: {
-        serviceWorkerVersion: serviceWorkerVersion,
-      }
-    }).then(function(engineInitializer) {
-      return engineInitializer.initializeEngine();
-    }).then(function(appRunner) {
-      return appRunner.runApp();
-    });
-  });
-</script>
+<div id="flutter_app_container"></div>
+
+<script src="main.dart.js" type="application/javascript"></script>
 </body>
 </html>

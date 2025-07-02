@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'geraeteaufnahme/geraeteaufnahme_screen.dart';
 import 'geraeteliste_screen.dart';
 import 'aufbereitung_screen.dart';
@@ -8,7 +9,7 @@ import 'service_screen.dart';
 import '../models/geraet.dart';
 import '../models/ersatzteil.dart';
 import '../models/verbautes_teil.dart';
-import '../widgets/selection_box.dart'; // NEU: Import des ausgelagerten Widgets
+import '../widgets/selection_box.dart';
 
 class AuswahlScreen extends StatelessWidget {
   final List<Geraet> geraete;
@@ -68,6 +69,16 @@ class AuswahlScreen extends StatelessWidget {
       length: 3,
       child: Scaffold(
         appBar: AppBar(
+          title: const Text('Hauptmenü'),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.logout),
+              tooltip: 'Abmelden',
+              onPressed: () async {
+                await FirebaseAuth.instance.signOut();
+              },
+            ),
+          ],
           bottom: const TabBar(
             tabs: [
               Tab(icon: Icon(Icons.work_history_outlined), text: "Arbeitsabläufe"),
@@ -75,7 +86,6 @@ class AuswahlScreen extends StatelessWidget {
               Tab(icon: Icon(Icons.admin_panel_settings_outlined), text: "Verwaltung"),
             ],
           ),
-          title: const Text('Hauptmenü'),
         ),
         body: TabBarView(
           children: [
@@ -104,7 +114,7 @@ class AuswahlScreen extends StatelessWidget {
           itemCount: items.length,
           itemBuilder: (ctx, index) {
             final item = items[index];
-            return SelectionBox( // GEÄNDERT: Verwendet das ausgelagerte Widget
+            return SelectionBox(
               title: item['title'],
               icon: item['icon'],
               color: item['color'],

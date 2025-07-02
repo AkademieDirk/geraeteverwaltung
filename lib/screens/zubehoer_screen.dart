@@ -3,6 +3,8 @@ import '../models/ersatzteil.dart';
 
 class ZubehoerScreen extends StatefulWidget {
   final List<Ersatzteil> ersatzteile;
+  // Dieser Parameter ist optional. Ist er gesetzt, wird der Screen
+  // zur reinen Ansicht für ein spezifisches Lager.
   final String? angezeigtesLager;
   final Future<void> Function(Ersatzteil) onAdd;
   final Future<void> Function(Ersatzteil) onUpdate;
@@ -26,6 +28,7 @@ class _ZubehoerScreenState extends State<ZubehoerScreen> {
   String _searchTerm = '';
 
   final List<String> _kategorien = ['Toner', 'Drum', 'Transferbelt', 'Fixierung', 'Entwickler', 'Sonstiges'];
+  final List<String> _lieferanten = ['Nichts ausgewählt', 'Katun', 'Biuromax'];
 
   @override
   void initState() {
@@ -48,10 +51,11 @@ class _ZubehoerScreenState extends State<ZubehoerScreen> {
 
     final artikelController = TextEditingController(text: ersatzteil?.artikelnummer ?? '');
     final bezeichnungController = TextEditingController(text: ersatzteil?.bezeichnung ?? '');
-    final herstellerController = TextEditingController(text: ersatzteil?.hersteller ?? ''); // NEU
-    final lieferantController = TextEditingController(text: ersatzteil?.lieferant ?? '');
+    final herstellerController = TextEditingController(text: ersatzteil?.hersteller ?? '');
+    final haendlerArtikelController = TextEditingController(text: ersatzteil?.haendlerArtikelnummer ?? '');
     final preisController = TextEditingController(text: isEdit ? ersatzteil.preis.toStringAsFixed(2) : '');
     String ausgewaehlteKategorie = ersatzteil?.kategorie ?? _kategorien.first;
+    String ausgewaehlterLieferant = isEdit && _lieferanten.contains(ersatzteil.lieferant) ? ersatzteil.lieferant : 'Nichts ausgewählt';
 
     showDialog(
       context: context,
@@ -69,9 +73,14 @@ class _ZubehoerScreenState extends State<ZubehoerScreen> {
               ),
               TextField(controller: artikelController, decoration: const InputDecoration(labelText: 'Artikelnummer')),
               TextField(controller: bezeichnungController, decoration: const InputDecoration(labelText: 'Bezeichnung')),
-              // --- NEU: Feld für den Hersteller ---
               TextField(controller: herstellerController, decoration: const InputDecoration(labelText: 'Hersteller')),
-              TextField(controller: lieferantController, decoration: const InputDecoration(labelText: 'Lieferant')),
+              TextField(controller: haendlerArtikelController, decoration: const InputDecoration(labelText: 'Händler-Art.-Nr.')),
+              DropdownButtonFormField<String>(
+                value: ausgewaehlterLieferant,
+                items: _lieferanten.map((l) => DropdownMenuItem(value: l, child: Text(l))).toList(),
+                decoration: const InputDecoration(labelText: 'Lieferant'),
+                onChanged: (val) { if (val != null) ausgewaehlterLieferant = val; },
+              ),
               TextField(
                 controller: preisController,
                 decoration: const InputDecoration(labelText: 'Preis (z.B. 99.99)'),
@@ -87,8 +96,9 @@ class _ZubehoerScreenState extends State<ZubehoerScreen> {
             onPressed: () async {
               final artikel = artikelController.text.trim();
               final bez = bezeichnungController.text.trim();
-              final herst = herstellerController.text.trim(); // NEU
-              final lief = lieferantController.text.trim();
+              final herst = herstellerController.text.trim();
+              final haendlerArt = haendlerArtikelController.text.trim();
+              final lief = ausgewaehlterLieferant == 'Nichts ausgewählt' ? '' : ausgewaehlterLieferant;
               final preis = double.tryParse(preisController.text.replaceAll(',', '.')) ?? 0.0;
 
               if (artikel.isEmpty || bez.isEmpty || lief.isEmpty || preis <= 0) {
@@ -100,7 +110,8 @@ class _ZubehoerScreenState extends State<ZubehoerScreen> {
                 id: isEdit ? ersatzteil.id : '',
                 artikelnummer: artikel,
                 bezeichnung: bez,
-                hersteller: herst, // NEU
+                hersteller: herst,
+                haendlerArtikelnummer: haendlerArt,
                 lieferant: lief,
                 preis: preis,
                 kategorie: ausgewaehlteKategorie,
@@ -217,8 +228,8 @@ class _ZubehoerScreenState extends State<ZubehoerScreen> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                // --- NEU: Hersteller wird hier angezeigt ---
                                 Text("Hersteller: ${teil.hersteller}"),
+                                Text("Lieferant: ${teil.lieferant}"),
                                 if (isLagerAnsicht)
                                   _buildBestandRow(widget.angezeigtesLager!, teil.lagerbestaende[widget.angezeigtesLager!] ?? 0, isHighlighted: true)
                                 else ...[
