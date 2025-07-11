@@ -6,15 +6,21 @@ import 'aufbereitung_screen.dart';
 import 'lagerverwaltung_screen.dart';
 import 'historie_screen.dart';
 import 'service_screen.dart';
+import 'kunden_screen.dart';
+import 'bestandsliste_screen.dart';
 import '../models/geraet.dart';
 import '../models/ersatzteil.dart';
 import '../models/verbautes_teil.dart';
+import '../models/kunde.dart';
+import '../models/standort.dart';
 import '../widgets/selection_box.dart';
 
 class AuswahlScreen extends StatelessWidget {
   final List<Geraet> geraete;
   final List<Ersatzteil> ersatzteile;
   final Map<String, List<VerbautesTeil>> verbauteTeile;
+  final List<Kunde> kunden;
+  final List<Standort> standorte;
 
   final Future<void> Function(Geraet) onAddGeraet;
   final Future<void> Function(Geraet) onUpdateGeraet;
@@ -30,11 +36,24 @@ class AuswahlScreen extends StatelessWidget {
   final Future<void> Function(Ersatzteil, String, String, int) onTransfer;
   final Future<void> Function(Ersatzteil, String, int) onBookIn;
 
+  final Future<void> Function(Kunde, Standort) onAddKunde;
+  final Future<void> Function(Kunde) onUpdateKunde;
+  final Future<void> Function(String) onDeleteKunde;
+
+  final Future<void> Function(Standort) onAddStandort;
+  final Future<void> Function(Standort) onUpdateStandort;
+  final Future<void> Function(String) onDeleteStandort;
+
+  final Future<void> Function(Geraet, Kunde, Standort) onAssignGeraet;
+  final Future<void> Function(List<Kunde>) onImportKunden;
+
   const AuswahlScreen({
     Key? key,
     required this.geraete,
     required this.ersatzteile,
     required this.verbauteTeile,
+    required this.kunden,
+    required this.standorte,
     required this.onAddGeraet,
     required this.onUpdateGeraet,
     required this.onDeleteGeraet,
@@ -46,6 +65,14 @@ class AuswahlScreen extends StatelessWidget {
     required this.onUpdateVerbautesTeil,
     required this.onTransfer,
     required this.onBookIn,
+    required this.onAddKunde,
+    required this.onUpdateKunde,
+    required this.onDeleteKunde,
+    required this.onAddStandort,
+    required this.onUpdateStandort,
+    required this.onDeleteStandort,
+    required this.onAssignGeraet,
+    required this.onImportKunden,
   }) : super(key: key);
 
   @override
@@ -57,11 +84,14 @@ class AuswahlScreen extends StatelessWidget {
     ];
 
     final List<Map<String, dynamic>> uebersichten = [
-      {'title': 'Geräteliste', 'icon': Icons.list_alt, 'color': Colors.green, 'onTap': () => Navigator.push(context, MaterialPageRoute(builder: (_) => GeraeteListeScreen(geraete: geraete, onUpdate: onUpdateGeraet, onDelete: onDeleteGeraet)))},
-      {'title': 'Historie', 'icon': Icons.history, 'color': Colors.teal, 'onTap': () => Navigator.push(context, MaterialPageRoute(builder: (_) => HistorieScreen(verbauteTeile: verbauteTeile, onDelete: onDeleteVerbautesTeil, onUpdate: onUpdateVerbautesTeil)))},
+      // KORREKTUR: Der Aufruf übergibt jetzt alle benötigten Parameter
+      {'title': 'Bestandsliste', 'icon': Icons.inventory, 'color': Colors.blueAccent, 'onTap': () => Navigator.push(context, MaterialPageRoute(builder: (_) => BestandslisteScreen(alleGeraete: geraete, onUpdate: onUpdateGeraet, onDelete: onDeleteGeraet, kunden: kunden, standorte: standorte, onAssign: onAssignGeraet)))},
+      {'title': 'Geräteliste (Alle)', 'icon': Icons.list_alt, 'color': Colors.green, 'onTap': () => Navigator.push(context, MaterialPageRoute(builder: (_) => GeraeteListeScreen(geraete: geraete, onUpdate: onUpdateGeraet, onDelete: onDeleteGeraet, kunden: kunden, standorte: standorte, onAssign: onAssignGeraet)))},
+      {'title': 'Historie', 'icon': Icons.history, 'color': Colors.teal, 'onTap': () => Navigator.push(context, MaterialPageRoute(builder: (_) => HistorieScreen(verbauteTeile: verbauteTeile, alleGeraete: geraete, onDelete: onDeleteVerbautesTeil, onUpdate: onUpdateVerbautesTeil)))},
     ];
 
     final List<Map<String, dynamic>> verwaltung = [
+      {'title': 'Kundenverwaltung', 'icon': Icons.people, 'color': Colors.red.shade400, 'onTap': () => Navigator.push(context, MaterialPageRoute(builder: (_) => KundenScreen(kunden: kunden, standorte: standorte, onAdd: onAddKunde, onUpdate: onUpdateKunde, onDelete: onDeleteKunde, onAddStandort: onAddStandort, onUpdateStandort: onUpdateStandort, onDeleteStandort: onDeleteStandort, onImport: onImportKunden)))},
       {'title': 'Lagerverwaltung', 'icon': Icons.warehouse, 'color': Colors.brown, 'onTap': () => Navigator.push(context, MaterialPageRoute(builder: (_) => LagerverwaltungScreen(ersatzteile: ersatzteile, onAdd: onAddErsatzteil, onUpdate: onUpdateErsatzteil, onDelete: onDeleteErsatzteil, onTransfer: onTransfer, onBookIn: onBookIn)))},
     ];
 
@@ -70,30 +100,10 @@ class AuswahlScreen extends StatelessWidget {
       child: Scaffold(
         appBar: AppBar(
           title: const Text('Hauptmenü'),
-          actions: [
-            IconButton(
-              icon: const Icon(Icons.logout),
-              tooltip: 'Abmelden',
-              onPressed: () async {
-                await FirebaseAuth.instance.signOut();
-              },
-            ),
-          ],
-          bottom: const TabBar(
-            tabs: [
-              Tab(icon: Icon(Icons.work_history_outlined), text: "Arbeitsabläufe"),
-              Tab(icon: Icon(Icons.table_chart_outlined), text: "Übersichten"),
-              Tab(icon: Icon(Icons.admin_panel_settings_outlined), text: "Verwaltung"),
-            ],
-          ),
+          actions: [IconButton(icon: const Icon(Icons.logout), tooltip: 'Abmelden', onPressed: () async { await FirebaseAuth.instance.signOut(); })],
+          bottom: const TabBar(tabs: [Tab(icon: Icon(Icons.work_history_outlined), text: "Arbeitsabläufe"), Tab(icon: Icon(Icons.table_chart_outlined), text: "Übersichten"), Tab(icon: Icon(Icons.admin_panel_settings_outlined), text: "Verwaltung")]),
         ),
-        body: TabBarView(
-          children: [
-            _buildSection(arbeitsablaeufe, context),
-            _buildSection(uebersichten, context),
-            _buildSection(verwaltung, context),
-          ],
-        ),
+        body: TabBarView(children: [_buildSection(arbeitsablaeufe, context), _buildSection(uebersichten, context), _buildSection(verwaltung, context)]),
       ),
     );
   }
@@ -114,12 +124,7 @@ class AuswahlScreen extends StatelessWidget {
           itemCount: items.length,
           itemBuilder: (ctx, index) {
             final item = items[index];
-            return SelectionBox(
-              title: item['title'],
-              icon: item['icon'],
-              color: item['color'],
-              onTap: item['onTap'],
-            );
+            return SelectionBox(title: item['title'], icon: item['icon'], color: item['color'], onTap: item['onTap']);
           },
         ),
       ),

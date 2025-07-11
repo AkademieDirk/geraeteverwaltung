@@ -45,7 +45,6 @@ class _ServiceScreenState extends State<ServiceScreen> {
     super.dispose();
   }
 
-  // --- KORREKTUR: Sucht jetzt nach Teilen der Seriennummer (case-insensitive) ---
   void _sucheGeraet() {
     final suchbegriff = _seriennummerController.text.trim().toLowerCase();
     if (suchbegriff.isEmpty) {
@@ -58,7 +57,7 @@ class _ServiceScreenState extends State<ServiceScreen> {
       );
       setState(() {
         _gefundenesGeraet = geraet;
-        _seriennummerController.text = geraet.seriennummer; // Füllt das Feld mit der vollen SN
+        _seriennummerController.text = geraet.seriennummer;
       });
     } catch (e) {
       setState(() { _gefundenesGeraet = null; });
@@ -66,7 +65,6 @@ class _ServiceScreenState extends State<ServiceScreen> {
     }
   }
 
-  // --- KORREKTUR: Sucht jetzt nach Teilen der Artikelnummer (case-insensitive) ---
   void _sucheArtikel() {
     final suchbegriff = _articleNumberController.text.trim().toLowerCase();
     if (suchbegriff.isEmpty) {
@@ -79,7 +77,7 @@ class _ServiceScreenState extends State<ServiceScreen> {
       );
       setState(() {
         _foundArticle = ersatzteil;
-        _articleNumberController.text = ersatzteil.artikelnummer; // Füllt das Feld mit der vollen Art.-Nr.
+        _articleNumberController.text = ersatzteil.artikelnummer;
         _selectedPartType = ersatzteil.kategorie;
         _gefilterteErsatzteile = widget.alleErsatzteile.where((t) => t.kategorie == _selectedPartType).toList();
         _selectedErsatzteil = ersatzteil;
@@ -134,6 +132,7 @@ class _ServiceScreenState extends State<ServiceScreen> {
                 MaterialPageRoute(
                   builder: (context) => HistorieScreen(
                     verbauteTeile: widget.verbauteTeile,
+                    alleGeraete: widget.alleGeraete,
                     onDelete: widget.onDeleteVerbautesTeil,
                     onUpdate: widget.onUpdateVerbautesTeil,
                   ),

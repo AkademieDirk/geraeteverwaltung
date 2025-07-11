@@ -9,7 +9,7 @@ class Geraet {
   String iOption;
   String pdfTyp;
   String durchsuchbar;
-  String ocr; // NEU: Feld für die OCR-Auswahl
+  String ocr;
   String originaleinzugTyp;
   String originaleinzugSN;
   String unterschrankTyp;
@@ -45,6 +45,13 @@ class Geraet {
   String dokumenteneinzug;
   String duplex;
 
+  // --- NEU: Felder für Kunden-Zuordnung und Status ---
+  String status; // z.B. 'Im Lager', 'Verkauft', 'Im Service'
+  String? kundeId;
+  String? kundeName;
+  String? standortId;
+  String? standortName;
+
   Geraet({
     this.id = '',
     required this.nummer,
@@ -54,7 +61,7 @@ class Geraet {
     this.iOption = '',
     this.pdfTyp = '',
     this.durchsuchbar = '',
-    this.ocr = '', // NEU
+    this.ocr = '',
     this.originaleinzugTyp = '',
     this.originaleinzugSN = '',
     this.unterschrankTyp = '',
@@ -89,6 +96,11 @@ class Geraet {
     this.bypass = '',
     this.dokumenteneinzug = '',
     this.duplex = '',
+    this.status = 'Im Lager', // Standardstatus für neue Geräte
+    this.kundeId,
+    this.kundeName,
+    this.standortId,
+    this.standortName,
   });
 
   Map<String, dynamic> toJson() {
@@ -100,7 +112,7 @@ class Geraet {
       'iOption': iOption,
       'pdfTyp': pdfTyp,
       'durchsuchbar': durchsuchbar,
-      'ocr': ocr, // NEU
+      'ocr': ocr,
       'originaleinzugTyp': originaleinzugTyp,
       'originaleinzugSN': originaleinzugSN,
       'unterschrankTyp': unterschrankTyp,
@@ -135,6 +147,12 @@ class Geraet {
       'bypass': bypass,
       'dokumenteneinzug': dokumenteneinzug,
       'duplex': duplex,
+      // --- NEU: Felder werden gespeichert ---
+      'status': status,
+      'kundeId': kundeId,
+      'kundeName': kundeName,
+      'standortId': standortId,
+      'standortName': standortName,
     };
   }
 
@@ -149,7 +167,7 @@ class Geraet {
       iOption: data['iOption'] ?? '',
       pdfTyp: data['pdfTyp'] ?? '',
       durchsuchbar: data['durchsuchbar'] ?? '',
-      ocr: data['ocr'] ?? '', // NEU
+      ocr: data['ocr'] ?? '',
       originaleinzugTyp: data['originaleinzugTyp'] ?? '',
       originaleinzugSN: data['originaleinzugSN'] ?? '',
       unterschrankTyp: data['unterschrankTyp'] ?? '',
@@ -184,6 +202,12 @@ class Geraet {
       bypass: data['bypass'] ?? '',
       dokumenteneinzug: data['dokumenteneinzug'] ?? '',
       duplex: data['duplex'] ?? '',
+      // --- NEU: Felder werden gelesen ---
+      status: data['status'] ?? 'Im Lager',
+      kundeId: data['kundeId'],
+      kundeName: data['kundeName'],
+      standortId: data['standortId'],
+      standortName: data['standortName'],
     );
   }
 }

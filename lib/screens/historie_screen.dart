@@ -1,15 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../models/verbautes_teil.dart';
+import '../models/geraet.dart';
 
 class HistorieScreen extends StatefulWidget {
   final Map<String, List<VerbautesTeil>> verbauteTeile;
+  final List<Geraet> alleGeraete;
   final Future<void> Function(String seriennummer, VerbautesTeil teil) onDelete;
   final Future<void> Function(String seriennummer, VerbautesTeil teil) onUpdate;
 
   const HistorieScreen({
     Key? key,
     required this.verbauteTeile,
+    required this.alleGeraete,
     required this.onDelete,
     required this.onUpdate,
   }) : super(key: key);
@@ -24,6 +27,7 @@ class _HistorieScreenState extends State<HistorieScreen> {
   double _gesamtkosten = 0.0;
   String _angezeigteSeriennummer = '';
   List<String> _suchergebnisse = [];
+  Geraet? _gefundenesGeraet;
 
   @override
   void dispose() {
@@ -31,6 +35,7 @@ class _HistorieScreenState extends State<HistorieScreen> {
     super.dispose();
   }
 
+  // --- GEÄNDERT: Sucht jetzt auch nach Kundennamen ---
   void _sucheHistorie() {
     final suchbegriff = _seriennummerController.text.trim().toLowerCase();
 
@@ -39,14 +44,23 @@ class _HistorieScreenState extends State<HistorieScreen> {
       _angezeigteSeriennummer = '';
       _gesamtkosten = 0.0;
       _suchergebnisse = [];
+      _gefundenesGeraet = null;
     });
 
-    if (suchbegriff.isEmpty) {
-      return;
-    }
+    if (suchbegriff.isEmpty) return;
 
-    final treffer = widget.verbauteTeile.keys
-        .where((seriennummer) => seriennummer.toLowerCase().contains(suchbegriff))
+    // Findet alle Geräte, die zum Suchbegriff passen (SN oder Kundenname)
+    final passendeGeraete = widget.alleGeraete.where((geraet) {
+      final seriennummerMatch = geraet.seriennummer.toLowerCase().contains(suchbegriff);
+      final kundenNameMatch = geraet.kundeName?.toLowerCase().contains(suchbegriff) ?? false;
+      return seriennummerMatch || kundenNameMatch;
+    }).toList();
+
+    // Sammelt die Seriennummern der gefundenen Geräte, für die eine Historie existiert
+    final treffer = passendeGeraete
+        .map((g) => g.seriennummer)
+        .where((sn) => widget.verbauteTeile.containsKey(sn) && widget.verbauteTeile[sn]!.isNotEmpty)
+        .toSet() // toSet, um Duplikate zu vermeiden
         .toList();
 
     if (treffer.isEmpty) {
@@ -66,40 +80,31 @@ class _HistorieScreenState extends State<HistorieScreen> {
     final teile = widget.verbauteTeile[seriennummer]!;
     final summe = teile.fold(0.0, (total, verbautesTeil) => total + verbautesTeil.tatsaechlicherPreis);
 
+    Geraet? zugehoerigesGeraet;
+    try {
+      zugehoerigesGeraet = widget.alleGeraete.firstWhere((g) => g.seriennummer == seriennummer);
+    } catch(e) {
+      zugehoerigesGeraet = null;
+    }
+
     setState(() {
       _gefundeneTeile = teile;
       _gesamtkosten = summe;
       _angezeigteSeriennummer = seriennummer;
       _suchergebnisse = [];
       _seriennummerController.text = seriennummer;
+      _gefundenesGeraet = zugehoerigesGeraet;
     });
   }
 
-  // --- GEÄNDERT: Fügt try-catch für besseres Feedback hinzu ---
   void _loescheVerbautesTeil(VerbautesTeil teil) async {
-    final sicher = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Eintrag löschen?'),
-        content: Text('Soll der Eintrag "${teil.ersatzteil.bezeichnung}" wirklich aus der Historie gelöscht werden?'),
-        actions: [
-          TextButton(child: const Text('Abbrechen'), onPressed: () => Navigator.pop(ctx, false)),
-          TextButton(child: Text('Löschen', style: TextStyle(color: Colors.red)), onPressed: () => Navigator.pop(ctx, true)),
-        ],
-      ),
-    );
-
+    final sicher = await showDialog<bool>(context: context, builder: (ctx) => AlertDialog(title: const Text('Eintrag löschen?'), content: Text('Soll der Eintrag "${teil.ersatzteil.bezeichnung}" wirklich aus der Historie gelöscht werden?'), actions: [TextButton(child: const Text('Abbrechen'), onPressed: () => Navigator.pop(ctx, false)), TextButton(child: Text('Löschen', style: TextStyle(color: Colors.red)), onPressed: () => Navigator.pop(ctx, true))]));
     if (sicher == true && mounted) {
       try {
         await widget.onDelete(_angezeigteSeriennummer, teil);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Eintrag erfolgreich gelöscht.'), backgroundColor: Colors.green),
-        );
-        // Die UI wird automatisch durch den StreamBuilder aktualisiert.
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Eintrag erfolgreich gelöscht.'), backgroundColor: Colors.green));
       } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Fehler beim Löschen: ${e.toString()}'), backgroundColor: Colors.red),
-        );
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Fehler beim Löschen: ${e.toString()}'), backgroundColor: Colors.red));
       }
     }
   }
@@ -107,42 +112,7 @@ class _HistorieScreenState extends State<HistorieScreen> {
   void _bearbeiteVerbautesTeilDialog(VerbautesTeil teil) {
     final preisController = TextEditingController(text: teil.tatsaechlicherPreis.toStringAsFixed(2));
     final bemerkungController = TextEditingController(text: teil.bemerkung);
-
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Eintrag bearbeiten'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(teil.ersatzteil.bezeichnung, style: TextStyle(fontWeight: FontWeight.bold)),
-            SizedBox(height: 16),
-            TextField(controller: preisController, decoration: InputDecoration(labelText: 'Tatsächlicher Preis', border: OutlineInputBorder(), suffixText: '€'), keyboardType: TextInputType.numberWithOptions(decimal: true)),
-            SizedBox(height: 16),
-            TextField(controller: bemerkungController, decoration: InputDecoration(labelText: 'Bemerkung (z.B. Abweichung)', border: OutlineInputBorder()), maxLines: 2),
-          ],
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: Text('Abbrechen')),
-          ElevatedButton(
-            onPressed: () async {
-              final neuerPreis = double.tryParse(preisController.text.replaceAll(',', '.')) ?? teil.tatsaechlicherPreis;
-              final geandertesTeil = VerbautesTeil(
-                id: teil.id,
-                ersatzteil: teil.ersatzteil,
-                installationsDatum: teil.installationsDatum,
-                tatsaechlicherPreis: neuerPreis,
-                bemerkung: bemerkungController.text.trim(),
-                herkunftslager: teil.herkunftslager,
-              );
-              await widget.onUpdate(_angezeigteSeriennummer, geandertesTeil);
-              Navigator.pop(context);
-            },
-            child: Text('Speichern'),
-          )
-        ],
-      ),
-    );
+    showDialog(context: context, builder: (context) => AlertDialog(title: Text('Eintrag bearbeiten'), content: Column(mainAxisSize: MainAxisSize.min, children: [Text(teil.ersatzteil.bezeichnung, style: TextStyle(fontWeight: FontWeight.bold)), SizedBox(height: 16), TextField(controller: preisController, decoration: InputDecoration(labelText: 'Tatsächlicher Preis', border: OutlineInputBorder(), suffixText: '€'), keyboardType: TextInputType.numberWithOptions(decimal: true)), SizedBox(height: 16), TextField(controller: bemerkungController, decoration: InputDecoration(labelText: 'Bemerkung (z.B. Abweichung)', border: OutlineInputBorder()), maxLines: 2)]), actions: [TextButton(onPressed: () => Navigator.pop(context), child: Text('Abbrechen')), ElevatedButton(onPressed: () async { final neuerPreis = double.tryParse(preisController.text.replaceAll(',', '.')) ?? teil.tatsaechlicherPreis; final geandertesTeil = VerbautesTeil(id: teil.id, ersatzteil: teil.ersatzteil, installationsDatum: teil.installationsDatum, tatsaechlicherPreis: neuerPreis, bemerkung: bemerkungController.text.trim(), herkunftslager: teil.herkunftslager); await widget.onUpdate(_angezeigteSeriennummer, geandertesTeil); Navigator.pop(context); }, child: Text('Speichern'))]));
   }
 
   @override
@@ -161,7 +131,11 @@ class _HistorieScreenState extends State<HistorieScreen> {
                 padding: const EdgeInsets.all(16.0),
                 child: TextField(
                   controller: _seriennummerController,
-                  decoration: InputDecoration(labelText: 'Seriennummer suchen', hintText: 'Auch Teile der Nummer sind möglich...', border: const OutlineInputBorder(), suffixIcon: IconButton(icon: const Icon(Icons.search), onPressed: _sucheHistorie, tooltip: 'Historie suchen')),
+                  decoration: InputDecoration(
+                      labelText: 'Suche nach Seriennummer oder Kunde',
+                      hintText: 'Teileingabe ist möglich...',
+                      border: const OutlineInputBorder(),
+                      suffixIcon: IconButton(icon: const Icon(Icons.search), onPressed: _sucheHistorie, tooltip: 'Historie suchen')),
                   onSubmitted: (_) => _sucheHistorie(),
                 ),
               ),
@@ -170,9 +144,7 @@ class _HistorieScreenState extends State<HistorieScreen> {
             Expanded(
               child: AnimatedSwitcher(
                 duration: const Duration(milliseconds: 300),
-                child: _suchergebnisse.isNotEmpty
-                    ? _buildSuchergebnisListe()
-                    : _buildHistorienAnsicht(),
+                child: _suchergebnisse.isNotEmpty ? _buildSuchergebnisListe() : _buildHistorienAnsicht(),
               ),
             ),
           ],
@@ -208,16 +180,10 @@ class _HistorieScreenState extends State<HistorieScreen> {
 
   Widget _buildHistorienAnsicht() {
     if (_angezeigteSeriennummer.isEmpty) {
-      return const Center(
-        key: ValueKey('leere_ansicht'),
-        child: Text('Bitte eine Seriennummer eingeben, um die Historie anzuzeigen.'),
-      );
+      return const Center(key: ValueKey('leere_ansicht'), child: Text('Bitte eine Seriennummer oder einen Kunden eingeben.'));
     }
     if (_gefundeneTeile.isEmpty) {
-      return Center(
-        key: ValueKey('keine_teile'),
-        child: Text('Für die Seriennummer $_angezeigteSeriennummer wurden keine Teile verbaut.'),
-      );
+      return Center(key: ValueKey('keine_teile'), child: Text('Für die Seriennummer $_angezeigteSeriennummer wurden keine Teile verbaut.'));
     }
     return Column(
       key: ValueKey(_angezeigteSeriennummer),
@@ -231,7 +197,12 @@ class _HistorieScreenState extends State<HistorieScreen> {
           ),
         ),
         const SizedBox(height: 16),
-        Text('Verbaute Teile für: $_angezeigteSeriennummer', style: Theme.of(context).textTheme.titleLarge),
+        Text('Historie für: $_angezeigteSeriennummer', style: Theme.of(context).textTheme.titleLarge),
+        if (_gefundenesGeraet?.kundeName != null && _gefundenesGeraet!.kundeName!.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(top: 4.0),
+            child: Text('Kunde: ${_gefundenesGeraet!.kundeName}', style: Theme.of(context).textTheme.titleMedium?.copyWith(color: Colors.grey.shade700)),
+          ),
         const SizedBox(height: 8),
         Expanded(
           child: ListView.builder(

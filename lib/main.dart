@@ -9,9 +9,10 @@ import 'screens/login_screen.dart';
 import 'models/geraet.dart';
 import 'models/ersatzteil.dart';
 import 'models/verbautes_teil.dart';
+import 'models/kunde.dart';
+import 'models/standort.dart';
 
 // --- Firestore Service ---
-// Diese Klasse bündelt alle Datenbank-Operationen an einem Ort.
 class FirestoreService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
   final Uuid _uuid = Uuid();
@@ -41,7 +42,6 @@ class FirestoreService {
       return historie;
     });
   }
-
   Future<void> addVerbautesTeil(String seriennummer, Ersatzteil teil, String lager) async {
     final ersatzteilRef = _db.collection('ersatzteile').doc(teil.id);
     final historieRef = _db.collection('historie').doc(seriennummer);
@@ -52,17 +52,10 @@ class FirestoreService {
       int aktuellerBestand = ersatzteilDaten.lagerbestaende[lager] ?? 0;
       if (aktuellerBestand <= 0) throw Exception("Kein Bestand in Lager '$lager'.");
       transaction.update(ersatzteilRef, {'lagerbestaende.$lager': FieldValue.increment(-1)});
-      final verbautesTeil = VerbautesTeil(
-          id: _uuid.v4(),
-          ersatzteil: teil,
-          installationsDatum: DateTime.now(),
-          tatsaechlicherPreis: teil.preis,
-          herkunftslager: lager
-      );
+      final verbautesTeil = VerbautesTeil(id: _uuid.v4(), ersatzteil: teil, installationsDatum: DateTime.now(), tatsaechlicherPreis: teil.preis, herkunftslager: lager);
       transaction.set(historieRef, {'teile': FieldValue.arrayUnion([verbautesTeil.toJson()])}, SetOptions(merge: true));
     });
   }
-
   Future<void> updateVerbautesTeil(String seriennummer, VerbautesTeil geandertesTeil) async {
     final docRef = _db.collection('historie').doc(seriennummer);
     final doc = await docRef.get();
@@ -76,7 +69,6 @@ class FirestoreService {
       }
     }
   }
-
   Future<void> deleteVerbautesTeil(String seriennummer, VerbautesTeil teil) async {
     final historieRef = _db.collection('historie').doc(seriennummer);
     if (teil.ersatzteil.id.isNotEmpty) {
@@ -101,7 +93,6 @@ class FirestoreService {
       }
     }
   }
-
   Future<void> transferErsatzteil(Ersatzteil teil, String vonLager, String nachLager, int anzahl) async {
     final ersatzteilRef = _db.collection('ersatzteile').doc(teil.id);
     return _db.runTransaction((transaction) async {
@@ -113,10 +104,43 @@ class FirestoreService {
       transaction.update(ersatzteilRef, {'lagerbestaende.$vonLager': FieldValue.increment(-anzahl), 'lagerbestaende.$nachLager': FieldValue.increment(anzahl)});
     });
   }
-
   Future<void> bookInErsatzteil(Ersatzteil teil, String lager, int anzahl) {
     final ersatzteilRef = _db.collection('ersatzteile').doc(teil.id);
     return ersatzteilRef.update({'lagerbestaende.$lager': FieldValue.increment(anzahl)});
+  }
+
+  // --- Kunden-Operationen ---
+  Stream<List<Kunde>> getKunden() => _db.collection('kunden').snapshots().map((snapshot) => snapshot.docs.map((doc) => Kunde.fromFirestore(doc)).toList());
+  Future<void> updateKunde(Kunde kunde) => _db.collection('kunden').doc(kunde.id).update(kunde.toJson());
+  Future<void> deleteKunde(String kundeId) => _db.collection('kunden').doc(kundeId).delete();
+  Future<void> addKundeAndStandort(Kunde kunde, Standort standort) {
+    WriteBatch batch = _db.batch();
+    DocumentReference kundenRef = _db.collection('kunden').doc();
+    batch.set(kundenRef, kunde.toJson());
+    standort.kundeId = kundenRef.id;
+    DocumentReference standortRef = _db.collection('standorte').doc();
+    batch.set(standortRef, standort.toJson());
+    return batch.commit();
+  }
+  Future<void> importKunden(List<Kunde> kunden) {
+    final batch = _db.batch();
+    for (final kunde in kunden) {
+      final docRef = _db.collection('kunden').doc();
+      batch.set(docRef, kunde.toJson());
+    }
+    return batch.commit();
+  }
+
+  // --- Standort-Operationen ---
+  Stream<List<Standort>> getStandorte() => _db.collection('standorte').snapshots().map((snapshot) => snapshot.docs.map((doc) => Standort.fromFirestore(doc)).toList());
+  Future<void> addStandort(Standort standort) => _db.collection('standorte').add(standort.toJson());
+  Future<void> updateStandort(Standort standort) => _db.collection('standorte').doc(standort.id).update(standort.toJson());
+  Future<void> deleteStandort(String standortId) => _db.collection('standorte').doc(standortId).delete();
+
+  // --- Geräte-Zuordnung ---
+  Future<void> assignGeraetToKunde(Geraet geraet, Kunde kunde, Standort standort) {
+    final geraetRef = _db.collection('geraete').doc(geraet.id);
+    return geraetRef.update({'status': 'Verkauft', 'kundeId': kunde.id, 'kundeName': kunde.name, 'standortId': standort.id, 'standortName': standort.name, 'nummer': ''});
   }
 }
 
@@ -129,11 +153,7 @@ void main() async {
 class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Gerätemanager',
-      theme: ThemeData(primarySwatch: Colors.blue),
-      home: AuthGate(),
-    );
+    return MaterialApp(title: 'Gerätemanager', theme: ThemeData(primarySwatch: Colors.blue), home: AuthGate());
   }
 }
 
@@ -143,12 +163,8 @@ class AuthGate extends StatelessWidget {
     return StreamBuilder<User?>(
       stream: FirebaseAuth.instance.authStateChanges(),
       builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Scaffold(body: Center(child: CircularProgressIndicator()));
-        }
-        if (snapshot.hasData) {
-          return MyHomePage();
-        }
+        if (snapshot.connectionState == ConnectionState.waiting) return const Scaffold(body: Center(child: CircularProgressIndicator()));
+        if (snapshot.hasData) return MyHomePage();
         return const LoginScreen();
       },
     );
@@ -182,21 +198,48 @@ class _MyHomePageState extends State<MyHomePage> {
                 if (historieSnapshot.connectionState == ConnectionState.waiting) return const Scaffold(body: Center(child: CircularProgressIndicator()));
                 if (historieSnapshot.hasError) return Scaffold(body: Center(child: Text('Fehler beim Laden der Historie: ${historieSnapshot.error}')));
                 final verbauteTeile = historieSnapshot.data ?? {};
-                return AuswahlScreen(
-                  geraete: geraete,
-                  ersatzteile: ersatzteile,
-                  verbauteTeile: verbauteTeile,
-                  onAddGeraet: _firestoreService.addGeraet,
-                  onUpdateGeraet: _firestoreService.updateGeraet,
-                  onDeleteGeraet: _firestoreService.deleteGeraet,
-                  onAddErsatzteil: _firestoreService.addErsatzteil,
-                  onUpdateErsatzteil: _firestoreService.updateErsatzteil,
-                  onDeleteErsatzteil: _firestoreService.deleteErsatzteil,
-                  onTeilVerbauen: _firestoreService.addVerbautesTeil,
-                  onDeleteVerbautesTeil: _firestoreService.deleteVerbautesTeil,
-                  onUpdateVerbautesTeil: _firestoreService.updateVerbautesTeil,
-                  onTransfer: _firestoreService.transferErsatzteil,
-                  onBookIn: _firestoreService.bookInErsatzteil,
+                return StreamBuilder<List<Kunde>>(
+                    stream: _firestoreService.getKunden(),
+                    builder: (context, kundenSnapshot) {
+                      if (kundenSnapshot.connectionState == ConnectionState.waiting) return const Scaffold(body: Center(child: CircularProgressIndicator()));
+                      if (kundenSnapshot.hasError) return Scaffold(body: Center(child: Text('Fehler beim Laden der Kunden: ${kundenSnapshot.error}')));
+                      final kunden = kundenSnapshot.data ?? [];
+                      return StreamBuilder<List<Standort>>(
+                          stream: _firestoreService.getStandorte(),
+                          builder: (context, standorteSnapshot) {
+                            if (standorteSnapshot.connectionState == ConnectionState.waiting) return const Scaffold(body: Center(child: CircularProgressIndicator()));
+                            if (standorteSnapshot.hasError) return Scaffold(body: Center(child: Text('Fehler beim Laden der Standorte: ${standorteSnapshot.error}')));
+                            final standorte = standorteSnapshot.data ?? [];
+
+                            return AuswahlScreen(
+                              geraete: geraete,
+                              ersatzteile: ersatzteile,
+                              verbauteTeile: verbauteTeile,
+                              kunden: kunden,
+                              standorte: standorte,
+                              onAddGeraet: _firestoreService.addGeraet,
+                              onUpdateGeraet: _firestoreService.updateGeraet,
+                              onDeleteGeraet: _firestoreService.deleteGeraet,
+                              onAddErsatzteil: _firestoreService.addErsatzteil,
+                              onUpdateErsatzteil: _firestoreService.updateErsatzteil,
+                              onDeleteErsatzteil: _firestoreService.deleteErsatzteil,
+                              onTeilVerbauen: _firestoreService.addVerbautesTeil,
+                              onDeleteVerbautesTeil: _firestoreService.deleteVerbautesTeil,
+                              onUpdateVerbautesTeil: _firestoreService.updateVerbautesTeil,
+                              onTransfer: _firestoreService.transferErsatzteil,
+                              onBookIn: _firestoreService.bookInErsatzteil,
+                              onAddKunde: _firestoreService.addKundeAndStandort,
+                              onUpdateKunde: _firestoreService.updateKunde,
+                              onDeleteKunde: _firestoreService.deleteKunde,
+                              onAddStandort: _firestoreService.addStandort,
+                              onUpdateStandort: _firestoreService.updateStandort,
+                              onDeleteStandort: _firestoreService.deleteStandort,
+                              onAssignGeraet: _firestoreService.assignGeraetToKunde,
+                              onImportKunden: _firestoreService.importKunden,
+                            );
+                          }
+                      );
+                    }
                 );
               },
             );

@@ -46,16 +46,16 @@ class _ZubehoerScreenState extends State<ZubehoerScreen> {
     super.dispose();
   }
 
-  void _stammDatenDialog({Ersatzteil? ersatzteil}) {
-    final isEdit = ersatzteil != null;
+  void _stammDatenDialog({Ersatzteil? ersatzteil, bool isCopy = false}) {
+    final isEdit = ersatzteil != null && !isCopy;
 
-    final artikelController = TextEditingController(text: ersatzteil?.artikelnummer ?? '');
+    final artikelController = TextEditingController(text: isCopy ? '' : ersatzteil?.artikelnummer ?? '');
     final bezeichnungController = TextEditingController(text: ersatzteil?.bezeichnung ?? '');
     final herstellerController = TextEditingController(text: ersatzteil?.hersteller ?? '');
     final haendlerArtikelController = TextEditingController(text: ersatzteil?.haendlerArtikelnummer ?? '');
-    final preisController = TextEditingController(text: isEdit ? ersatzteil.preis.toStringAsFixed(2) : '');
+    final preisController = TextEditingController(text: isEdit || isCopy ? ersatzteil!.preis.toStringAsFixed(2) : '');
     String ausgewaehlteKategorie = ersatzteil?.kategorie ?? _kategorien.first;
-    String ausgewaehlterLieferant = isEdit && _lieferanten.contains(ersatzteil.lieferant) ? ersatzteil.lieferant : 'Nichts ausgewählt';
+    String ausgewaehlterLieferant = (isEdit || isCopy) && _lieferanten.contains(ersatzteil!.lieferant) ? ersatzteil.lieferant : 'Nichts ausgewählt';
 
     showDialog(
       context: context,
@@ -94,25 +94,20 @@ class _ZubehoerScreenState extends State<ZubehoerScreen> {
           ElevatedButton(
             child: Text(isEdit ? 'Speichern' : 'Hinzufügen'),
             onPressed: () async {
-              final artikel = artikelController.text.trim();
-              final bez = bezeichnungController.text.trim();
-              final herst = herstellerController.text.trim();
-              final haendlerArt = haendlerArtikelController.text.trim();
-              final lief = ausgewaehlterLieferant == 'Nichts ausgewählt' ? '' : ausgewaehlterLieferant;
               final preis = double.tryParse(preisController.text.replaceAll(',', '.')) ?? 0.0;
 
-              if (artikel.isEmpty || bez.isEmpty || lief.isEmpty || preis <= 0) {
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Bitte alle Felder korrekt ausfüllen!')));
+              if (preis <= 0) {
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Bitte einen gültigen Preis angeben!')));
                 return;
               }
 
               final neuesTeil = Ersatzteil(
                 id: isEdit ? ersatzteil.id : '',
-                artikelnummer: artikel,
-                bezeichnung: bez,
-                hersteller: herst,
-                haendlerArtikelnummer: haendlerArt,
-                lieferant: lief,
+                artikelnummer: artikelController.text.trim(),
+                bezeichnung: bezeichnungController.text.trim(),
+                hersteller: herstellerController.text.trim(),
+                haendlerArtikelnummer: haendlerArtikelController.text.trim(),
+                lieferant: ausgewaehlterLieferant == 'Nichts ausgewählt' ? '' : ausgewaehlterLieferant,
                 preis: preis,
                 kategorie: ausgewaehlteKategorie,
                 lagerbestaende: isEdit ? ersatzteil.lagerbestaende : null,
@@ -161,7 +156,8 @@ class _ZubehoerScreenState extends State<ZubehoerScreen> {
       gefilterteListe = widget.ersatzteile.where((teil) {
         final suchbegriff = _searchTerm.toLowerCase();
         return teil.bezeichnung.toLowerCase().contains(suchbegriff) ||
-            teil.artikelnummer.toLowerCase().contains(suchbegriff);
+            teil.artikelnummer.toLowerCase().contains(suchbegriff) ||
+            teil.hersteller.toLowerCase().contains(suchbegriff);
       }).toList();
     }
 
@@ -179,7 +175,7 @@ class _ZubehoerScreenState extends State<ZubehoerScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(isLagerAnsicht ? 'Bestand: ${widget.angezeigtesLager}' : 'Stammdaten & Bestand'),
+        title: Text(isLagerAnsicht ? 'Bestand: ${widget.angezeigtesLager}' : 'Stammdaten'),
         actions: isLagerAnsicht ? [] : [
           IconButton(
             icon: const Icon(Icons.add),
@@ -195,7 +191,7 @@ class _ZubehoerScreenState extends State<ZubehoerScreen> {
             child: TextField(
               controller: _searchController,
               decoration: InputDecoration(
-                labelText: 'Suche nach Bezeichnung oder Artikelnummer',
+                labelText: 'Suche nach Bezeichnung, Artikel-Nr. oder Hersteller',
                 prefixIcon: const Icon(Icons.search),
                 suffixIcon: _searchTerm.isNotEmpty ? IconButton(icon: const Icon(Icons.clear), onPressed: () => _searchController.clear()) : null,
                 border: const OutlineInputBorder(),
@@ -215,7 +211,7 @@ class _ZubehoerScreenState extends State<ZubehoerScreen> {
                 return Card(
                   margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
                   child: ExpansionTile(
-                    title: Text('$kategorie ($bestandInDieserKategorie Stk.)', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                    title: Text('$kategorie ($bestandInDieserKategorie Artikel)', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
                     children: teile.map((teil) {
                       return Card(
                         elevation: 0,
@@ -246,6 +242,8 @@ class _ZubehoerScreenState extends State<ZubehoerScreen> {
                               Text('${teil.preis.toStringAsFixed(2)} €'),
                               if(!isLagerAnsicht)
                                 IconButton(icon: const Icon(Icons.edit, color: Colors.orange), tooltip: 'Bearbeiten', onPressed: () => _stammDatenDialog(ersatzteil: teil)),
+                              if(!isLagerAnsicht)
+                                IconButton(icon: const Icon(Icons.copy, color: Colors.blue), tooltip: 'Kopieren', onPressed: () => _stammDatenDialog(ersatzteil: teil, isCopy: true)),
                               if(!isLagerAnsicht)
                                 IconButton(icon: const Icon(Icons.delete, color: Colors.red), tooltip: 'Löschen', onPressed: () => _deleteErsatzteil(teil)),
                             ],

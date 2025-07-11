@@ -61,24 +61,25 @@ class _AufbereitungScreenState extends State<AufbereitungScreen> {
   }
 
   void _sucheArtikel() {
-    final artikelnummer = _articleNumberController.text.trim();
+    final artikelnummer = _articleNumberController.text.trim().toLowerCase();
     if (artikelnummer.isEmpty) {
       setState(() => _foundArticle = null);
       return;
     }
     try {
       final ersatzteil = widget.alleErsatzteile.firstWhere(
-            (teil) => teil.artikelnummer == artikelnummer,
+            (teil) => teil.artikelnummer.toLowerCase().contains(artikelnummer),
       );
       setState(() {
         _foundArticle = ersatzteil;
+        _articleNumberController.text = ersatzteil.artikelnummer;
         _selectedPartType = ersatzteil.kategorie;
         _gefilterteErsatzteile = widget.alleErsatzteile.where((t) => t.kategorie == _selectedPartType).toList();
         _selectedErsatzteil = ersatzteil;
       });
     } catch (e) {
       setState(() { _foundArticle = null; });
-      _showSnackbar(context, 'Artikelnummer nicht im Zubehör gefunden.');
+      _showSnackbar(context, 'Kein Ersatzteil für "${_articleNumberController.text}" gefunden.');
     }
   }
 
@@ -126,6 +127,7 @@ class _AufbereitungScreenState extends State<AufbereitungScreen> {
                 MaterialPageRoute(
                   builder: (context) => HistorieScreen(
                     verbauteTeile: widget.verbauteTeile,
+                    alleGeraete: widget.alleGeraete, // KORREKTUR: Fehlender Parameter
                     onDelete: widget.onDeleteVerbautesTeil,
                     onUpdate: widget.onUpdateVerbautesTeil,
                   ),

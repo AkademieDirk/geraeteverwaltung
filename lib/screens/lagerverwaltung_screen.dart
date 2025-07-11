@@ -6,6 +6,7 @@ import 'wareneingang_screen.dart';
 
 class LagerverwaltungScreen extends StatelessWidget {
   final List<Ersatzteil> ersatzteile;
+  // Nimmt alle notwendigen Funktionen vom Haupt-Screen entgegen
   final Future<void> Function(Ersatzteil) onAdd;
   final Future<void> Function(Ersatzteil) onUpdate;
   final Future<void> Function(String) onDelete;
@@ -21,22 +22,6 @@ class LagerverwaltungScreen extends StatelessWidget {
     required this.onTransfer,
     required this.onBookIn,
   }) : super(key: key);
-
-  // Hilfsfunktion für die Navigation, um Code-Wiederholung zu vermeiden
-  void _navigateToLagerAnsicht(BuildContext context, String lagerName) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => ZubehoerScreen(
-          ersatzteile: ersatzteile,
-          onAdd: onAdd,
-          onUpdate: onUpdate,
-          onDelete: onDelete,
-          angezeigtesLager: lagerName,
-        ),
-      ),
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -86,25 +71,6 @@ class LagerverwaltungScreen extends StatelessWidget {
                 )));
               },
             ),
-            // --- KORREKTUR: Lageransichten wieder hinzugefügt ---
-            _SelectionBox(
-              title: 'Hauptlager',
-              icon: Icons.home_work_outlined,
-              color: Colors.blueGrey,
-              onTap: () => _navigateToLagerAnsicht(context, 'Hauptlager'),
-            ),
-            _SelectionBox(
-              title: 'Fahrzeug Patrick',
-              icon: Icons.directions_car,
-              color: Colors.indigo,
-              onTap: () => _navigateToLagerAnsicht(context, 'Fahrzeug Patrick'),
-            ),
-            _SelectionBox(
-              title: 'Fahrzeug Melanie',
-              icon: Icons.directions_car,
-              color: Colors.pink.shade300,
-              onTap: () => _navigateToLagerAnsicht(context, 'Fahrzeug Melanie'),
-            ),
           ],
         ),
       ),
@@ -112,6 +78,7 @@ class LagerverwaltungScreen extends StatelessWidget {
   }
 }
 
+// Design-Element für die Kacheln
 class _SelectionBox extends StatelessWidget {
   final String title;
   final IconData icon;
