@@ -6,6 +6,8 @@ class Geraet {
   String modell;
   String seriennummer;
   String mitarbeiter;
+  Timestamp? aufnahmeDatum;
+  String lieferant;
   String iOption;
   String pdfTyp;
   String durchsuchbar;
@@ -44,9 +46,7 @@ class Geraet {
   String bypass;
   String dokumenteneinzug;
   String duplex;
-
-  // --- NEU: Felder für Kunden-Zuordnung und Status ---
-  String status; // z.B. 'Im Lager', 'Verkauft', 'Im Service'
+  String status;
   String? kundeId;
   String? kundeName;
   String? standortId;
@@ -58,6 +58,8 @@ class Geraet {
     required this.modell,
     required this.seriennummer,
     this.mitarbeiter = '',
+    this.aufnahmeDatum,
+    this.lieferant = '',
     this.iOption = '',
     this.pdfTyp = '',
     this.durchsuchbar = '',
@@ -96,7 +98,7 @@ class Geraet {
     this.bypass = '',
     this.dokumenteneinzug = '',
     this.duplex = '',
-    this.status = 'Im Lager', // Standardstatus für neue Geräte
+    this.status = 'Im Lager',
     this.kundeId,
     this.kundeName,
     this.standortId,
@@ -109,6 +111,8 @@ class Geraet {
       'modell': modell,
       'seriennummer': seriennummer,
       'mitarbeiter': mitarbeiter,
+      'aufnahmeDatum': aufnahmeDatum,
+      'lieferant': lieferant,
       'iOption': iOption,
       'pdfTyp': pdfTyp,
       'durchsuchbar': durchsuchbar,
@@ -147,7 +151,6 @@ class Geraet {
       'bypass': bypass,
       'dokumenteneinzug': dokumenteneinzug,
       'duplex': duplex,
-      // --- NEU: Felder werden gespeichert ---
       'status': status,
       'kundeId': kundeId,
       'kundeName': kundeName,
@@ -164,6 +167,8 @@ class Geraet {
       modell: data['modell'] ?? '',
       seriennummer: data['seriennummer'] ?? '',
       mitarbeiter: data['mitarbeiter'] ?? '',
+      aufnahmeDatum: data['aufnahmeDatum'] as Timestamp?,
+      lieferant: data['lieferant'] ?? '',
       iOption: data['iOption'] ?? '',
       pdfTyp: data['pdfTyp'] ?? '',
       durchsuchbar: data['durchsuchbar'] ?? '',
@@ -202,7 +207,6 @@ class Geraet {
       bypass: data['bypass'] ?? '',
       dokumenteneinzug: data['dokumenteneinzug'] ?? '',
       duplex: data['duplex'] ?? '',
-      // --- NEU: Felder werden gelesen ---
       status: data['status'] ?? 'Im Lager',
       kundeId: data['kundeId'],
       kundeName: data['kundeName'],

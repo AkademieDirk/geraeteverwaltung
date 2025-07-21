@@ -12,7 +12,6 @@ import 'models/verbautes_teil.dart';
 import 'models/kunde.dart';
 import 'models/standort.dart';
 
-// --- Firestore Service ---
 class FirestoreService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
   final Uuid _uuid = Uuid();
@@ -22,6 +21,14 @@ class FirestoreService {
   Future<void> addGeraet(Geraet geraet) => _db.collection('geraete').add(geraet.toJson());
   Future<void> updateGeraet(Geraet geraet) => _db.collection('geraete').doc(geraet.id).update(geraet.toJson());
   Future<void> deleteGeraet(String geraetId) => _db.collection('geraete').doc(geraetId).delete();
+  Future<void> importGeraete(List<Geraet> geraete) {
+    final batch = _db.batch();
+    for (final geraet in geraete) {
+      final docRef = _db.collection('geraete').doc();
+      batch.set(docRef, geraet.toJson());
+    }
+    return batch.commit();
+  }
 
   // --- Ersatzteil-Operationen ---
   Stream<List<Ersatzteil>> getErsatzteile() => _db.collection('ersatzteile').snapshots().map((snapshot) => snapshot.docs.map((doc) => Ersatzteil.fromFirestore(doc)).toList());
@@ -220,6 +227,7 @@ class _MyHomePageState extends State<MyHomePage> {
                               onAddGeraet: _firestoreService.addGeraet,
                               onUpdateGeraet: _firestoreService.updateGeraet,
                               onDeleteGeraet: _firestoreService.deleteGeraet,
+                              onImportGeraete: _firestoreService.importGeraete,
                               onAddErsatzteil: _firestoreService.addErsatzteil,
                               onUpdateErsatzteil: _firestoreService.updateErsatzteil,
                               onDeleteErsatzteil: _firestoreService.deleteErsatzteil,
@@ -231,11 +239,11 @@ class _MyHomePageState extends State<MyHomePage> {
                               onAddKunde: _firestoreService.addKundeAndStandort,
                               onUpdateKunde: _firestoreService.updateKunde,
                               onDeleteKunde: _firestoreService.deleteKunde,
+                              onImportKunden: _firestoreService.importKunden,
                               onAddStandort: _firestoreService.addStandort,
                               onUpdateStandort: _firestoreService.updateStandort,
                               onDeleteStandort: _firestoreService.deleteStandort,
                               onAssignGeraet: _firestoreService.assignGeraetToKunde,
-                              onImportKunden: _firestoreService.importKunden,
                             );
                           }
                       );

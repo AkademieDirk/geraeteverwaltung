@@ -11,7 +11,6 @@ class GeraeteListeScreen extends StatefulWidget {
   final List<Geraet> geraete;
   final Future<void> Function(Geraet) onUpdate;
   final Future<void> Function(String) onDelete;
-  // NEU: Benötigt Kunden- und Standortdaten
   final List<Kunde> kunden;
   final List<Standort> standorte;
   final Future<void> Function(Geraet, Kunde, Standort) onAssign;
@@ -56,11 +55,9 @@ class _GeraeteListeScreenState extends State<GeraeteListeScreen> {
         safeToString(g.seriennummer).toLowerCase().contains(begriff) ||
         safeToString(g.mitarbeiter).toLowerCase().contains(begriff) ||
         safeToString(g.kundeName ?? '').toLowerCase().contains(begriff) ||
-        safeToString(g.standortName ?? '').toLowerCase().contains(begriff)
-    ).toList();
+        safeToString(g.standortName ?? '').toLowerCase().contains(begriff)).toList();
   }
 
-  // Dialog zur Zuordnung eines Geräts zu einem Kunden und Standort
   void _showZuordnungsDialog(Geraet geraet) {
     Kunde? selectedKunde;
     Standort? selectedStandort;
@@ -139,12 +136,17 @@ class _GeraeteListeScreenState extends State<GeraeteListeScreen> {
         ),
       );
     }
+
     pdf.addPage(
       pw.MultiPage(
         margin: const pw.EdgeInsets.all(30),
         pageFormat: PdfPageFormat.a4,
         header: (pw.Context context) {
-          return pw.Header(level: 0, child: pw.Text('Gerätedatenblatt: ${safeToString(g.modell)}', style: pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold)));
+          return pw.Header(
+            level: 0,
+            child: pw.Text('Gerätedatenblatt: ${safeToString(g.modell)}',
+                style: pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold)),
+          );
         },
         build: (pw.Context context) => [
           pw.Divider(thickness: 1.5),
@@ -154,10 +156,10 @@ class _GeraeteListeScreenState extends State<GeraeteListeScreen> {
           _pdfRow('Kunde:', safeToString(g.kundeName)),
           _pdfRow('Standort:', safeToString(g.standortName)),
           pw.Divider(height: 15),
-          // ... (Rest der PDF-Logik)
         ],
       ),
     );
+
     await Printing.layoutPdf(onLayout: (PdfPageFormat format) async => pdf.save());
   }
 
@@ -171,7 +173,22 @@ class _GeraeteListeScreenState extends State<GeraeteListeScreen> {
             padding: const EdgeInsets.all(16),
             child: TextField(
               controller: _suchController,
-              decoration: InputDecoration(labelText: 'Suche (Modell, SN, Kunde...)', prefixIcon: Icon(Icons.search), suffixIcon: _suchbegriff.isNotEmpty ? IconButton(icon: Icon(Icons.clear), onPressed: () { setState(() { _suchController.clear(); _suchbegriff = ''; }); }) : null, border: OutlineInputBorder()),
+              decoration: InputDecoration(
+                labelText: 'Suche (Modell, SN, Kunde...)',
+                prefixIcon: Icon(Icons.search),
+                suffixIcon: _suchbegriff.isNotEmpty
+                    ? IconButton(
+                  icon: Icon(Icons.clear),
+                  onPressed: () {
+                    setState(() {
+                      _suchController.clear();
+                      _suchbegriff = '';
+                    });
+                  },
+                )
+                    : null,
+                border: OutlineInputBorder(),
+              ),
               onChanged: (wert) => setState(() => _suchbegriff = wert.trim()),
             ),
           ),
@@ -189,8 +206,14 @@ class _GeraeteListeScreenState extends State<GeraeteListeScreen> {
                   margin: const EdgeInsets.symmetric(vertical: 10),
                   elevation: 3,
                   child: ExpansionTile(
-                    title: Text('${g.modell} (SN: ${g.seriennummer})', style: TextStyle(fontWeight: FontWeight.bold)),
-                    subtitle: Text(imLager ? 'Status: Im Lager (Nr: ${g.nummer})' : 'Kunde: ${g.kundeName ?? ''} - ${g.standortName ?? ''}', style: TextStyle(color: imLager ? Colors.green : Colors.blue)),
+                    title: Text('${g.modell} (SN: ${g.seriennummer})',
+                        style: TextStyle(fontWeight: FontWeight.bold)),
+                    subtitle: Text(
+                      imLager
+                          ? 'Status: Im Lager (Nr: ${g.nummer})'
+                          : 'Kunde: ${g.kundeName ?? ''} - ${g.standortName ?? ''}',
+                      style: TextStyle(color: imLager ? Colors.green : Colors.blue),
+                    ),
                     children: [
                       Divider(),
                       _row('Verantwortlich:', safeToString(g.mitarbeiter)),
@@ -202,20 +225,56 @@ class _GeraeteListeScreenState extends State<GeraeteListeScreen> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.end,
                         children: [
-                          // --- NEU: Button wird nur angezeigt, wenn Gerät im Lager ist ---
                           if (imLager)
                             ElevatedButton.icon(
                               icon: Icon(Icons.local_shipping, size: 18),
                               label: Text('Ausliefern'),
                               onPressed: () => _showZuordnungsDialog(g),
-                              style: ElevatedButton.styleFrom(backgroundColor: Colors.blueAccent, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8)),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.blueAccent,
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                              ),
                             ),
-                          IconButton(icon: Icon(Icons.edit, color: Colors.orange), tooltip: 'Bearbeiten', onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => GeraeteAufnahmeScreen(initialGeraet: g, onSave: widget.onUpdate)))),
-                          IconButton(icon: Icon(Icons.delete, color: Colors.red), tooltip: 'Löschen', onPressed: () async {
-                            final sicher = await showDialog<bool>(context: context, builder: (ctx) => AlertDialog(title: Text('Löschen bestätigen'), content: Text('Gerät "${g.modell}" wirklich löschen?'), actions: [TextButton(child: Text('Abbrechen'), onPressed: () => Navigator.pop(ctx, false)), TextButton(child: Text('Löschen', style: TextStyle(color: Colors.red)), onPressed: () => Navigator.pop(ctx, true))]));
-                            if (sicher == true) { await widget.onDelete(g.id); }
-                          }),
-                          IconButton(icon: Icon(Icons.print, color: Colors.grey[700]), tooltip: 'Datenblatt drucken', onPressed: () => _druckeGeraetAsPdf(g)),
+                          IconButton(
+                            icon: Icon(Icons.edit, color: Colors.orange),
+                            tooltip: 'Bearbeiten',
+                            onPressed: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => GeraeteAufnahmeScreen(
+                                  initialGeraet: g,
+                                  onSave: widget.onUpdate,
+                                  onImport: (_) async {}, // Dummy-Funktion ergänzt
+                                ),
+                              ),
+                            ),
+                          ),
+                          IconButton(
+                            icon: Icon(Icons.delete, color: Colors.red),
+                            tooltip: 'Löschen',
+                            onPressed: () async {
+                              final sicher = await showDialog<bool>(
+                                context: context,
+                                builder: (ctx) => AlertDialog(
+                                  title: Text('Löschen bestätigen'),
+                                  content: Text('Gerät "${g.modell}" wirklich löschen?'),
+                                  actions: [
+                                    TextButton(child: Text('Abbrechen'), onPressed: () => Navigator.pop(ctx, false)),
+                                    TextButton(child: Text('Löschen', style: TextStyle(color: Colors.red)), onPressed: () => Navigator.pop(ctx, true)),
+                                  ],
+                                ),
+                              );
+                              if (sicher == true) {
+                                await widget.onDelete(g.id);
+                              }
+                            },
+                          ),
+                          IconButton(
+                            icon: Icon(Icons.print, color: Colors.grey[700]),
+                            tooltip: 'Datenblatt drucken',
+                            onPressed: () => _druckeGeraetAsPdf(g),
+                          ),
                         ],
                       ),
                       SizedBox(height: 8),

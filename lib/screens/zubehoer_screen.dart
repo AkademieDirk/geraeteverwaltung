@@ -3,8 +3,6 @@ import '../models/ersatzteil.dart';
 
 class ZubehoerScreen extends StatefulWidget {
   final List<Ersatzteil> ersatzteile;
-  // Dieser Parameter ist optional. Ist er gesetzt, wird der Screen
-  // zur reinen Ansicht für ein spezifisches Lager.
   final String? angezeigtesLager;
   final Future<void> Function(Ersatzteil) onAdd;
   final Future<void> Function(Ersatzteil) onUpdate;
@@ -204,14 +202,19 @@ class _ZubehoerScreenState extends State<ZubehoerScreen> {
                 : ListView(
               children: sortierteKategorien.map((kategorie) {
                 final teile = gruppiert[kategorie]!;
-                final int bestandInDieserKategorie = isLagerAnsicht
+
+                // --- ANFANG DER ÄNDERUNG ---
+                final int anzahl = isLagerAnsicht
                     ? teile.fold(0, (sum, teil) => sum + (teil.lagerbestaende[widget.angezeigtesLager!] ?? 0))
-                    : teile.fold(0, (sum, teil) => sum + teil.getGesamtbestand());
+                    : teile.length;
+
+                final String einheit = isLagerAnsicht ? 'Stk.' : 'Artikel';
+                // --- ENDE DER ÄNDERUNG ---
 
                 return Card(
                   margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
                   child: ExpansionTile(
-                    title: Text('$kategorie ($bestandInDieserKategorie Artikel)', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                    title: Text('$kategorie ($anzahl $einheit)', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
                     children: teile.map((teil) {
                       return Card(
                         elevation: 0,

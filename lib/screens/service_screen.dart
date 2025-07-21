@@ -46,34 +46,32 @@ class _ServiceScreenState extends State<ServiceScreen> {
   }
 
   void _sucheGeraet() {
-    final suchbegriff = _seriennummerController.text.trim().toLowerCase();
-    if (suchbegriff.isEmpty) {
+    final eingegebeneSeriennummer = _seriennummerController.text.trim().toLowerCase();
+    if (eingegebeneSeriennummer.isEmpty) {
       setState(() { _gefundenesGeraet = null; });
       return;
     }
     try {
-      final geraet = widget.alleGeraete.firstWhere(
-              (g) => g.seriennummer.toLowerCase().contains(suchbegriff)
-      );
+      final geraet = widget.alleGeraete.firstWhere((g) => g.seriennummer.toLowerCase().contains(eingegebeneSeriennummer));
       setState(() {
         _gefundenesGeraet = geraet;
         _seriennummerController.text = geraet.seriennummer;
       });
     } catch (e) {
       setState(() { _gefundenesGeraet = null; });
-      _showSnackbar(context, 'Kein Gerät für "${_seriennummerController.text}" gefunden.');
+      _showSnackbar(context, 'Kein Gerät mit dieser Seriennummer gefunden.');
     }
   }
 
   void _sucheArtikel() {
-    final suchbegriff = _articleNumberController.text.trim().toLowerCase();
-    if (suchbegriff.isEmpty) {
+    final artikelnummer = _articleNumberController.text.trim().toLowerCase();
+    if (artikelnummer.isEmpty) {
       setState(() => _foundArticle = null);
       return;
     }
     try {
       final ersatzteil = widget.alleErsatzteile.firstWhere(
-            (teil) => teil.artikelnummer.toLowerCase().contains(suchbegriff),
+            (teil) => teil.artikelnummer.toLowerCase().contains(artikelnummer),
       );
       setState(() {
         _foundArticle = ersatzteil;

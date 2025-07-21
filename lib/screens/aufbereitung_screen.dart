@@ -127,7 +127,7 @@ class _AufbereitungScreenState extends State<AufbereitungScreen> {
                 MaterialPageRoute(
                   builder: (context) => HistorieScreen(
                     verbauteTeile: widget.verbauteTeile,
-                    alleGeraete: widget.alleGeraete, // KORREKTUR: Fehlender Parameter
+                    alleGeraete: widget.alleGeraete,
                     onDelete: widget.onDeleteVerbautesTeil,
                     onUpdate: widget.onUpdateVerbautesTeil,
                   ),

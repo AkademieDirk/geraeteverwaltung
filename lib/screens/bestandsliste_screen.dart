@@ -56,12 +56,16 @@ class _BestandslisteScreenState extends State<BestandslisteScreen> {
                       value: selectedKunde,
                       hint: const Text('Kunde auswählen'),
                       isExpanded: true,
-                      items: widget.kunden.map((k) => DropdownMenuItem(value: k, child: Text(k.name))).toList(),
+                      items: widget.kunden
+                          .map((k) => DropdownMenuItem(value: k, child: Text(k.name)))
+                          .toList(),
                       onChanged: (val) {
                         setDialogState(() {
                           selectedKunde = val;
                           selectedStandort = null;
-                          kundenStandorte = widget.standorte.where((s) => s.kundeId == selectedKunde!.id).toList();
+                          kundenStandorte = widget.standorte
+                              .where((s) => s.kundeId == selectedKunde!.id)
+                              .toList();
                         });
                       },
                     ),
@@ -71,7 +75,9 @@ class _BestandslisteScreenState extends State<BestandslisteScreen> {
                         value: selectedStandort,
                         hint: const Text('Standort auswählen'),
                         isExpanded: true,
-                        items: kundenStandorte.map((s) => DropdownMenuItem(value: s, child: Text(s.name))).toList(),
+                        items: kundenStandorte
+                            .map((s) => DropdownMenuItem(value: s, child: Text(s.name)))
+                            .toList(),
                         onChanged: (val) {
                           setDialogState(() {
                             selectedStandort = val;
@@ -82,12 +88,15 @@ class _BestandslisteScreenState extends State<BestandslisteScreen> {
                 ),
               ),
               actions: [
-                TextButton(child: const Text('Abbrechen'), onPressed: () => Navigator.of(ctx).pop()),
+                TextButton(
+                    child: const Text('Abbrechen'),
+                    onPressed: () => Navigator.of(ctx).pop()),
                 ElevatedButton(
                   child: const Text('Bestätigen & Ausliefern'),
                   onPressed: (selectedKunde != null && selectedStandort != null)
                       ? () async {
-                    await widget.onAssign(geraet, selectedKunde!, selectedStandort!);
+                    await widget.onAssign(
+                        geraet, selectedKunde!, selectedStandort!);
                     Navigator.of(ctx).pop();
                   }
                       : null,
@@ -102,18 +111,19 @@ class _BestandslisteScreenState extends State<BestandslisteScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final bestandsGeraete = widget.alleGeraete.where((g) => g.status == 'Im Lager').toList();
+    final bestandsGeraete =
+    widget.alleGeraete.where((g) => g.status == 'Im Lager').toList();
 
     final List<Geraet> gefilterteListe;
     if (_suchbegriff.isEmpty) {
       gefilterteListe = bestandsGeraete;
     } else {
       final begriff = _suchbegriff.toLowerCase();
-      gefilterteListe = bestandsGeraete.where((g) =>
-      g.nummer.toLowerCase().contains(begriff) ||
-          g.modell.toLowerCase().contains(begriff) ||
-          g.seriennummer.toLowerCase().contains(begriff)
-      ).toList();
+      gefilterteListe = bestandsGeraete.where((g) {
+        return g.nummer.toLowerCase().contains(begriff) ||
+            g.modell.toLowerCase().contains(begriff) ||
+            g.seriennummer.toLowerCase().contains(begriff);
+      }).toList();
     }
 
     return Scaffold(
@@ -124,8 +134,24 @@ class _BestandslisteScreenState extends State<BestandslisteScreen> {
             padding: const EdgeInsets.all(16),
             child: TextField(
               controller: _suchController,
-              decoration: InputDecoration(labelText: 'Bestand durchsuchen...', prefixIcon: Icon(Icons.search), suffixIcon: _suchbegriff.isNotEmpty ? IconButton(icon: Icon(Icons.clear), onPressed: () { setState(() { _suchController.clear(); _suchbegriff = ''; }); }) : null, border: OutlineInputBorder()),
-              onChanged: (wert) => setState(() => _suchbegriff = wert.trim()),
+              decoration: InputDecoration(
+                labelText: 'Bestand durchsuchen...',
+                prefixIcon: Icon(Icons.search),
+                suffixIcon: _suchbegriff.isNotEmpty
+                    ? IconButton(
+                  icon: Icon(Icons.clear),
+                  onPressed: () {
+                    setState(() {
+                      _suchController.clear();
+                      _suchbegriff = '';
+                    });
+                  },
+                )
+                    : null,
+                border: OutlineInputBorder(),
+              ),
+              onChanged: (wert) =>
+                  setState(() => _suchbegriff = wert.trim()),
             ),
           ),
           Expanded(
@@ -140,14 +166,38 @@ class _BestandslisteScreenState extends State<BestandslisteScreen> {
                 return Card(
                   margin: const EdgeInsets.symmetric(vertical: 8),
                   child: ListTile(
-                    leading: CircleAvatar(child: Icon(Icons.inventory_2_outlined)),
-                    title: Text('${g.modell} (SN: ${g.seriennummer})', style: TextStyle(fontWeight: FontWeight.bold)),
+                    leading: CircleAvatar(
+                        child: Icon(Icons.inventory_2_outlined)),
+                    title: Text(
+                      '${g.modell} (SN: ${g.seriennummer})',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
                     subtitle: Text('Interne Nr: ${g.nummer}'),
                     trailing: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        IconButton(icon: Icon(Icons.local_shipping, color: Colors.blueAccent), tooltip: 'Ausliefern', onPressed: () => _showZuordnungsDialog(g)),
-                        IconButton(icon: Icon(Icons.edit, color: Colors.orange), tooltip: 'Bearbeiten', onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => GeraeteAufnahmeScreen(initialGeraet: g, onSave: widget.onUpdate)))),
+                        IconButton(
+                          icon: Icon(Icons.local_shipping,
+                              color: Colors.blueAccent),
+                          tooltip: 'Ausliefern',
+                          onPressed: () =>
+                              _showZuordnungsDialog(g),
+                        ),
+                        IconButton(
+                          icon: Icon(Icons.edit,
+                              color: Colors.orange),
+                          tooltip: 'Bearbeiten',
+                          onPressed: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => GeraeteAufnahmeScreen(
+                                initialGeraet: g,
+                                onSave: widget.onUpdate,
+                                onImport: (_) async {}, // ❗ hinzugefügt
+                              ),
+                            ),
+                          ),
+                        ),
                       ],
                     ),
                   ),

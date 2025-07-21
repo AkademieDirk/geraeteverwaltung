@@ -1,4 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:excel/excel.dart';
 import '../../models/geraet.dart';
 import '../../widgets/prozent_dropdown.dart';
 import '../../widgets/zubehoer_eingabe_zeile.dart';
@@ -8,11 +12,13 @@ import '../../widgets/testergebnisse_eingabe.dart';
 class GeraeteAufnahmeScreen extends StatefulWidget {
   final Geraet? initialGeraet;
   final Future<void> Function(Geraet) onSave;
+  final Future<void> Function(List<Geraet>) onImport;
 
   const GeraeteAufnahmeScreen({
     Key? key,
     this.initialGeraet,
     required this.onSave,
+    required this.onImport,
   }) : super(key: key);
 
   @override
@@ -21,6 +27,7 @@ class GeraeteAufnahmeScreen extends StatefulWidget {
 
 class _GeraeteAufnahmeScreenState extends State<GeraeteAufnahmeScreen> {
   final _formKey = GlobalKey<FormState>();
+  bool _isImporting = false;
 
   // Dropdown-Optionen
   final List<String> _modellOptionen = [
@@ -38,6 +45,8 @@ class _GeraeteAufnahmeScreenState extends State<GeraeteAufnahmeScreen> {
   final _seriennummerController = TextEditingController();
   String _selectedMitarbeiter = 'Nichts ausgewählt';
   String _selectedModell = 'Nichts ausgewählt';
+  DateTime? _selectedAufnahmeDatum;
+  final _lieferantController = TextEditingController();
   String _selectedIOption = 'Nichts ausgewählt';
   String _selectedPdfTyp = 'Nichts ausgewählt';
   String _selectedDurchsuchbar = 'Nichts ausgewählt';
@@ -53,21 +62,10 @@ class _GeraeteAufnahmeScreenState extends State<GeraeteAufnahmeScreen> {
   final _zaehlerGesamtController = TextEditingController();
   final _zaehlerSWController = TextEditingController();
   final _zaehlerColorController = TextEditingController();
-  int _rtb = 0;
-  int _tonerK = 0;
-  int _tonerC = 0;
-  int _tonerM = 0;
-  int _tonerY = 0;
-  int _laufzeitBildeinheitK = 0;
-  int _laufzeitBildeinheitC = 0;
-  int _laufzeitBildeinheitM = 0;
-  int _laufzeitBildeinheitY = 0;
-  int _laufzeitEntwicklerK = 0;
-  int _laufzeitEntwicklerC = 0;
-  int _laufzeitEntwicklerM = 0;
-  int _laufzeitEntwicklerY = 0;
-  int _laufzeitFixiereinheit = 0;
-  int _laufzeitTransferbelt = 0;
+  int _rtb = 0, _tonerK = 0, _tonerC = 0, _tonerM = 0, _tonerY = 0;
+  int _laufzeitBildeinheitK = 0, _laufzeitBildeinheitC = 0, _laufzeitBildeinheitM = 0, _laufzeitBildeinheitY = 0;
+  int _laufzeitEntwicklerK = 0, _laufzeitEntwicklerC = 0, _laufzeitEntwicklerM = 0, _laufzeitEntwicklerY = 0;
+  int _laufzeitFixiereinheit = 0, _laufzeitTransferbelt = 0;
   final _fach1Controller = TextEditingController();
   final _fach2Controller = TextEditingController();
   final _fach3Controller = TextEditingController();
@@ -83,9 +81,11 @@ class _GeraeteAufnahmeScreenState extends State<GeraeteAufnahmeScreen> {
     if (widget.initialGeraet != null) {
       final g = widget.initialGeraet!;
       _nummerController.text = g.nummer;
+      _selectedMitarbeiter = _mitarbeiterOptionen.contains(g.mitarbeiter) ? g.mitarbeiter : 'Nichts ausgewählt';
+      _selectedAufnahmeDatum = g.aufnahmeDatum?.toDate();
+      _lieferantController.text = g.lieferant;
       _selectedModell = _modellOptionen.contains(g.modell) ? g.modell : 'Nichts ausgewählt';
       _seriennummerController.text = g.seriennummer;
-      _selectedMitarbeiter = _mitarbeiterOptionen.contains(g.mitarbeiter) ? g.mitarbeiter : 'Nichts ausgewählt';
       _selectedIOption = _jaNeinOptionen.contains(g.iOption) ? g.iOption : 'Nichts ausgewählt';
       _selectedPdfTyp = _pdfTypen.contains(g.pdfTyp) ? g.pdfTyp : 'Nichts ausgewählt';
       _selectedDurchsuchbar = _jaNeinOptionen.contains(g.durchsuchbar) ? g.durchsuchbar : 'Nichts ausgewählt';
@@ -124,6 +124,8 @@ class _GeraeteAufnahmeScreenState extends State<GeraeteAufnahmeScreen> {
       _dokumenteneinzugController.text = g.dokumenteneinzug;
       _duplexController.text = g.duplex;
       _bemerkungController.text = g.bemerkung;
+    } else {
+      _selectedAufnahmeDatum = DateTime.now();
     }
   }
 
@@ -131,6 +133,7 @@ class _GeraeteAufnahmeScreenState extends State<GeraeteAufnahmeScreen> {
   void dispose() {
     _nummerController.dispose();
     _seriennummerController.dispose();
+    _lieferantController.dispose();
     _originaleinzugSNController.dispose();
     _unterschrankSNController.dispose();
     _finisherSNController.dispose();
@@ -147,6 +150,52 @@ class _GeraeteAufnahmeScreenState extends State<GeraeteAufnahmeScreen> {
     _duplexController.dispose();
     _bemerkungController.dispose();
     super.dispose();
+  }
+
+  Future<void> _importGeraete() async {
+    setState(() => _isImporting = true);
+    try {
+      FilePickerResult? result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['xlsx', 'csv'],
+      );
+
+      if (result != null && result.files.single.bytes != null) {
+        var bytes = result.files.single.bytes!;
+        var excel = Excel.decodeBytes(bytes);
+        var sheet = excel.tables[excel.tables.keys.first];
+
+        if (sheet == null) throw Exception("Kein Tabellenblatt in der Datei gefunden.");
+
+        List<Geraet> geraeteToImport = [];
+        for (var i = 1; i < sheet.rows.length; i++) {
+          var row = sheet.rows[i];
+          if (row.length >= 3 && row[0] != null && row[1] != null && row[2] != null) {
+            geraeteToImport.add(Geraet(
+              nummer: row[0]?.value.toString() ?? '',
+              modell: row[1]?.value.toString() ?? '',
+              seriennummer: row[2]?.value.toString() ?? '',
+              mitarbeiter: row.length > 3 ? row[3]?.value.toString() ?? '' : '',
+              iOption: row.length > 4 ? row[4]?.value.toString() ?? '' : '',
+              pdfTyp: row.length > 5 ? row[5]?.value.toString() ?? '' : '',
+              durchsuchbar: row.length > 6 ? row[6]?.value.toString() ?? '' : '',
+              ocr: row.length > 7 ? row[7]?.value.toString() ?? '' : '',
+            ));
+          }
+        }
+
+        if (geraeteToImport.isNotEmpty) {
+          await widget.onImport(geraeteToImport);
+          if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${geraeteToImport.length} Geräte erfolgreich importiert!'), backgroundColor: Colors.green));
+        } else {
+          if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Keine gültigen Geräte in der Datei gefunden.'), backgroundColor: Colors.orange));
+        }
+      }
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Fehler beim Import: ${e.toString()}'), backgroundColor: Colors.red));
+    } finally {
+      if (mounted) setState(() => _isImporting = false);
+    }
   }
 
   void _updateZaehlerGesamt() {
@@ -171,6 +220,8 @@ class _GeraeteAufnahmeScreenState extends State<GeraeteAufnahmeScreen> {
       modell: clean(_selectedModell),
       seriennummer: _seriennummerController.text.trim(),
       mitarbeiter: clean(_selectedMitarbeiter),
+      aufnahmeDatum: _selectedAufnahmeDatum != null ? Timestamp.fromDate(_selectedAufnahmeDatum!) : null,
+      lieferant: _lieferantController.text.trim(),
       iOption: clean(_selectedIOption),
       pdfTyp: clean(_selectedPdfTyp),
       durchsuchbar: clean(_selectedDurchsuchbar),
@@ -217,21 +268,55 @@ class _GeraeteAufnahmeScreenState extends State<GeraeteAufnahmeScreen> {
     Navigator.of(context).pop();
   }
 
+  Future<void> _selectDate(BuildContext context) async {
+    final DateTime? picked = await showDatePicker(context: context, initialDate: _selectedAufnahmeDatum ?? DateTime.now(), firstDate: DateTime(2010), lastDate: DateTime(2100));
+    if (picked != null && picked != _selectedAufnahmeDatum) {
+      setState(() {
+        _selectedAufnahmeDatum = picked;
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     bool showFinisherSN = _selectedFinisher != 'Nichts ausgewählt' && _selectedFinisher != 'Kein';
     bool showFaxSN = _selectedFax == 'Ja';
 
     return Scaffold(
-      appBar: AppBar(title: Text(widget.initialGeraet == null ? 'Neues Gerät anlegen' : 'Gerät bearbeiten')),
+      appBar: AppBar(
+        title: Text(widget.initialGeraet == null ? 'Neues Gerät anlegen' : 'Gerät bearbeiten'),
+        actions: [
+          _isImporting
+              ? const Padding(
+            padding: EdgeInsets.all(16.0),
+            child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white)),
+          )
+              : IconButton(
+            icon: const Icon(Icons.upload_file),
+            tooltip: 'Geräte aus Excel importieren',
+            onPressed: _importGeraete,
+          ),
+        ],
+      ),
       body: Padding(
         padding: const EdgeInsets.all(24.0),
         child: Form(
           key: _formKey,
           child: ListView(
             children: [
-              DropdownButtonFormField<String>(value: _selectedMitarbeiter, decoration: const InputDecoration(labelText: 'Verantwortlicher Mitarbeiter'), items: _mitarbeiterOptionen.map((m) => DropdownMenuItem(value: m, child: Text(m))).toList(), onChanged: (val) => setState(() => _selectedMitarbeiter = val ?? 'Nichts ausgewählt')),
               TextFormField(controller: _nummerController, decoration: const InputDecoration(labelText: 'Gerätenummer*')),
+              const SizedBox(height: 8),
+              DropdownButtonFormField<String>(value: _selectedMitarbeiter, decoration: const InputDecoration(labelText: 'Verantwortlicher Mitarbeiter'), items: _mitarbeiterOptionen.map((m) => DropdownMenuItem(value: m, child: Text(m))).toList(), onChanged: (val) => setState(() => _selectedMitarbeiter = val ?? 'Nichts ausgewählt')),
+              const SizedBox(height: 8),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                title: Text("Aufnahmedatum: ${DateFormat('dd.MM.yyyy').format(_selectedAufnahmeDatum ?? DateTime.now())}"),
+                trailing: Icon(Icons.calendar_today),
+                onTap: () => _selectDate(context),
+              ),
+              TextFormField(controller: _lieferantController, decoration: const InputDecoration(labelText: 'Lieferant')),
+              const Divider(height: 32),
+
               DropdownButtonFormField<String>(value: _selectedModell, decoration: const InputDecoration(labelText: 'Modell*'), items: _modellOptionen.map((m) => DropdownMenuItem(value: m, child: Text(m))).toList(), onChanged: (val) => setState(() => _selectedModell = val ?? 'Nichts ausgewählt')),
               TextFormField(controller: _seriennummerController, decoration: const InputDecoration(labelText: 'Seriennummer')),
               DropdownButtonFormField<String>(value: _selectedIOption, decoration: const InputDecoration(labelText: 'I-Option'), items: _jaNeinOptionen.map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(), onChanged: (val) => setState(() => _selectedIOption = val ?? 'Nichts ausgewählt')),

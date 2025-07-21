@@ -25,6 +25,7 @@ class AuswahlScreen extends StatelessWidget {
   final Future<void> Function(Geraet) onAddGeraet;
   final Future<void> Function(Geraet) onUpdateGeraet;
   final Future<void> Function(String) onDeleteGeraet;
+  final Future<void> Function(List<Geraet>) onImportGeraete;
 
   final Future<void> Function(Ersatzteil) onAddErsatzteil;
   final Future<void> Function(Ersatzteil) onUpdateErsatzteil;
@@ -39,13 +40,13 @@ class AuswahlScreen extends StatelessWidget {
   final Future<void> Function(Kunde, Standort) onAddKunde;
   final Future<void> Function(Kunde) onUpdateKunde;
   final Future<void> Function(String) onDeleteKunde;
+  final Future<void> Function(List<Kunde>) onImportKunden;
 
   final Future<void> Function(Standort) onAddStandort;
   final Future<void> Function(Standort) onUpdateStandort;
   final Future<void> Function(String) onDeleteStandort;
 
   final Future<void> Function(Geraet, Kunde, Standort) onAssignGeraet;
-  final Future<void> Function(List<Kunde>) onImportKunden;
 
   const AuswahlScreen({
     Key? key,
@@ -57,6 +58,7 @@ class AuswahlScreen extends StatelessWidget {
     required this.onAddGeraet,
     required this.onUpdateGeraet,
     required this.onDeleteGeraet,
+    required this.onImportGeraete,
     required this.onAddErsatzteil,
     required this.onUpdateErsatzteil,
     required this.onDeleteErsatzteil,
@@ -68,23 +70,22 @@ class AuswahlScreen extends StatelessWidget {
     required this.onAddKunde,
     required this.onUpdateKunde,
     required this.onDeleteKunde,
+    required this.onImportKunden,
     required this.onAddStandort,
     required this.onUpdateStandort,
     required this.onDeleteStandort,
     required this.onAssignGeraet,
-    required this.onImportKunden,
   }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
     final List<Map<String, dynamic>> arbeitsablaeufe = [
-      {'title': 'Geräteaufnahme', 'icon': Icons.add_box, 'color': Colors.blue, 'onTap': () => Navigator.push(context, MaterialPageRoute(builder: (_) => GeraeteAufnahmeScreen(onSave: onAddGeraet)))},
+      {'title': 'Geräteaufnahme', 'icon': Icons.add_box, 'color': Colors.blue, 'onTap': () => Navigator.push(context, MaterialPageRoute(builder: (_) => GeraeteAufnahmeScreen(onSave: onAddGeraet, onImport: onImportGeraete)))},
       {'title': 'Aufbereitung', 'icon': Icons.build, 'color': Colors.deepPurple, 'onTap': () => Navigator.push(context, MaterialPageRoute(builder: (_) => AufbereitungScreen(alleGeraete: geraete, alleErsatzteile: ersatzteile, verbauteTeile: verbauteTeile, onTeilVerbauen: onTeilVerbauen, onDeleteVerbautesTeil: onDeleteVerbautesTeil, onUpdateVerbautesTeil: onUpdateVerbautesTeil)))},
       {'title': 'Service', 'icon': Icons.miscellaneous_services, 'color': Colors.orange, 'onTap': () => Navigator.push(context, MaterialPageRoute(builder: (_) => ServiceScreen(alleGeraete: geraete, alleErsatzteile: ersatzteile, verbauteTeile: verbauteTeile, onTeilVerbauen: onTeilVerbauen, onDeleteVerbautesTeil: onDeleteVerbautesTeil, onUpdateVerbautesTeil: onUpdateVerbautesTeil)))},
     ];
 
     final List<Map<String, dynamic>> uebersichten = [
-      // KORREKTUR: Der Aufruf übergibt jetzt alle benötigten Parameter
       {'title': 'Bestandsliste', 'icon': Icons.inventory, 'color': Colors.blueAccent, 'onTap': () => Navigator.push(context, MaterialPageRoute(builder: (_) => BestandslisteScreen(alleGeraete: geraete, onUpdate: onUpdateGeraet, onDelete: onDeleteGeraet, kunden: kunden, standorte: standorte, onAssign: onAssignGeraet)))},
       {'title': 'Geräteliste (Alle)', 'icon': Icons.list_alt, 'color': Colors.green, 'onTap': () => Navigator.push(context, MaterialPageRoute(builder: (_) => GeraeteListeScreen(geraete: geraete, onUpdate: onUpdateGeraet, onDelete: onDeleteGeraet, kunden: kunden, standorte: standorte, onAssign: onAssignGeraet)))},
       {'title': 'Historie', 'icon': Icons.history, 'color': Colors.teal, 'onTap': () => Navigator.push(context, MaterialPageRoute(builder: (_) => HistorieScreen(verbauteTeile: verbauteTeile, alleGeraete: geraete, onDelete: onDeleteVerbautesTeil, onUpdate: onUpdateVerbautesTeil)))},
