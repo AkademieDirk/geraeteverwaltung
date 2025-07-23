@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:excel/excel.dart';
 import '../models/geraet.dart';
 import '../models/kunde.dart';
 import '../models/standort.dart';
@@ -11,6 +13,7 @@ class BestandslisteScreen extends StatefulWidget {
   final List<Kunde> kunden;
   final List<Standort> standorte;
   final Future<void> Function(Geraet, Kunde, Standort) onAssign;
+  final Future<void> Function(List<Geraet>) onImport;
 
   const BestandslisteScreen({
     Key? key,
@@ -20,6 +23,7 @@ class BestandslisteScreen extends StatefulWidget {
     required this.kunden,
     required this.standorte,
     required this.onAssign,
+    required this.onImport,
   }) : super(key: key);
 
   @override
@@ -29,6 +33,14 @@ class BestandslisteScreen extends StatefulWidget {
 class _BestandslisteScreenState extends State<BestandslisteScreen> {
   final TextEditingController _suchController = TextEditingController();
   String _suchbegriff = '';
+  bool _isImporting = false;
+
+  String _selectedEinzugFilter = 'Alle';
+  final List<String> _einzugFilterOptionen = ['Alle', 'Kein', 'DF-714', 'DF-715', 'DF-632', 'DF-633', 'Sonstiges'];
+
+  String _selectedOcrFilter = 'Alle';
+  final List<String> _ocrFilterOptionen = ['Alle', 'Ja', 'Nein'];
+
 
   @override
   void dispose() {
@@ -36,10 +48,55 @@ class _BestandslisteScreenState extends State<BestandslisteScreen> {
     super.dispose();
   }
 
+  Future<void> _importGeraete() async {
+    setState(() => _isImporting = true);
+    try {
+      FilePickerResult? result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['xlsx', 'csv'],
+      );
+
+      if (result != null && result.files.single.bytes != null) {
+        var bytes = result.files.single.bytes!;
+        var excel = Excel.decodeBytes(bytes);
+        var sheet = excel.tables[excel.tables.keys.first];
+
+        if (sheet == null) throw Exception("Kein Tabellenblatt in der Datei gefunden.");
+
+        List<Geraet> geraeteToImport = [];
+        for (var i = 1; i < sheet.rows.length; i++) {
+          var row = sheet.rows[i];
+          if (row.length >= 3 && row[0] != null && row[1] != null && row[2] != null) {
+            geraeteToImport.add(Geraet(
+              nummer: row[0]?.value.toString() ?? '',
+              modell: row[1]?.value.toString() ?? '',
+              seriennummer: row[2]?.value.toString() ?? '',
+              mitarbeiter: row.length > 3 ? row[3]?.value.toString() ?? '' : '',
+              lieferant: row.length > 5 ? row[5]?.value.toString() ?? '' : '',
+            ));
+          }
+        }
+
+        if (geraeteToImport.isNotEmpty) {
+          await widget.onImport(geraeteToImport);
+          if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${geraeteToImport.length} neue Geräte erfolgreich importiert!'), backgroundColor: Colors.green));
+        } else {
+          if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Keine neuen Geräte in der Datei gefunden.'), backgroundColor: Colors.orange));
+        }
+      }
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Fehler beim Import: ${e.toString()}'), backgroundColor: Colors.red));
+    } finally {
+      if (mounted) setState(() => _isImporting = false);
+    }
+  }
+
   void _showZuordnungsDialog(Geraet geraet) {
     Kunde? selectedKunde;
     Standort? selectedStandort;
     List<Standort> kundenStandorte = [];
+    String kundenSuchbegriff = '';
+    List<Kunde> gefilterteKunden = widget.kunden;
 
     showDialog(
       context: context,
@@ -49,54 +106,71 @@ class _BestandslisteScreenState extends State<BestandslisteScreen> {
             return AlertDialog(
               title: Text('Gerät "${geraet.modell}" ausliefern'),
               content: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    DropdownButtonFormField<Kunde>(
-                      value: selectedKunde,
-                      hint: const Text('Kunde auswählen'),
-                      isExpanded: true,
-                      items: widget.kunden
-                          .map((k) => DropdownMenuItem(value: k, child: Text(k.name)))
-                          .toList(),
-                      onChanged: (val) {
-                        setDialogState(() {
-                          selectedKunde = val;
-                          selectedStandort = null;
-                          kundenStandorte = widget.standorte
-                              .where((s) => s.kundeId == selectedKunde!.id)
-                              .toList();
-                        });
-                      },
-                    ),
-                    const SizedBox(height: 16),
-                    if (selectedKunde != null)
-                      DropdownButtonFormField<Standort>(
-                        value: selectedStandort,
-                        hint: const Text('Standort auswählen'),
-                        isExpanded: true,
-                        items: kundenStandorte
-                            .map((s) => DropdownMenuItem(value: s, child: Text(s.name)))
-                            .toList(),
-                        onChanged: (val) {
+                child: SizedBox(
+                  width: MediaQuery.of(context).size.width * 0.4,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      TextField(
+                        autofocus: true,
+                        decoration: const InputDecoration(
+                          labelText: 'Kunde suchen (Name oder Kundennr.)',
+                          prefixIcon: Icon(Icons.search),
+                        ),
+                        onChanged: (wert) {
                           setDialogState(() {
-                            selectedStandort = val;
+                            kundenSuchbegriff = wert.toLowerCase();
+                            gefilterteKunden = widget.kunden.where((k) {
+                              return k.name.toLowerCase().contains(kundenSuchbegriff) ||
+                                  k.kundennummer.toLowerCase().contains(kundenSuchbegriff);
+                            }).toList();
+                            selectedKunde = null;
+                            selectedStandort = null;
                           });
                         },
                       ),
-                  ],
+                      const SizedBox(height: 24),
+                      DropdownButtonFormField<Kunde>(
+                        value: selectedKunde,
+                        hint: const Text('Kunde auswählen'),
+                        isExpanded: true,
+                        items: gefilterteKunden.map((k) => DropdownMenuItem(value: k, child: Text(k.name))).toList(),
+                        onChanged: (val) {
+                          setDialogState(() {
+                            selectedKunde = val;
+                            selectedStandort = null;
+                            if (selectedKunde != null) {
+                              kundenStandorte = widget.standorte.where((s) => s.kundeId == selectedKunde!.id).toList();
+                            } else {
+                              kundenStandorte = [];
+                            }
+                          });
+                        },
+                      ),
+                      const SizedBox(height: 16),
+                      if (selectedKunde != null)
+                        DropdownButtonFormField<Standort>(
+                          value: selectedStandort,
+                          hint: const Text('Standort auswählen'),
+                          isExpanded: true,
+                          items: kundenStandorte.map((s) => DropdownMenuItem(value: s, child: Text(s.name))).toList(),
+                          onChanged: (val) {
+                            setDialogState(() {
+                              selectedStandort = val;
+                            });
+                          },
+                        ),
+                    ],
+                  ),
                 ),
               ),
               actions: [
-                TextButton(
-                    child: const Text('Abbrechen'),
-                    onPressed: () => Navigator.of(ctx).pop()),
+                TextButton(child: const Text('Abbrechen'), onPressed: () => Navigator.of(ctx).pop()),
                 ElevatedButton(
                   child: const Text('Bestätigen & Ausliefern'),
                   onPressed: (selectedKunde != null && selectedStandort != null)
                       ? () async {
-                    await widget.onAssign(
-                        geraet, selectedKunde!, selectedStandort!);
+                    await widget.onAssign(geraet, selectedKunde!, selectedStandort!);
                     Navigator.of(ctx).pop();
                   }
                       : null,
@@ -111,95 +185,123 @@ class _BestandslisteScreenState extends State<BestandslisteScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final bestandsGeraete =
-    widget.alleGeraete.where((g) => g.status == 'Im Lager').toList();
+    List<Geraet> gefilterteListe = widget.alleGeraete.where((g) => g.status == 'Im Lager').toList();
 
-    final List<Geraet> gefilterteListe;
-    if (_suchbegriff.isEmpty) {
-      gefilterteListe = bestandsGeraete;
-    } else {
-      final begriff = _suchbegriff.toLowerCase();
-      gefilterteListe = bestandsGeraete.where((g) {
-        return g.nummer.toLowerCase().contains(begriff) ||
-            g.modell.toLowerCase().contains(begriff) ||
-            g.seriennummer.toLowerCase().contains(begriff);
-      }).toList();
+    if (_selectedEinzugFilter != 'Alle') {
+      gefilterteListe = gefilterteListe.where((g) => g.originaleinzugTyp == _selectedEinzugFilter).toList();
     }
 
+    if (_selectedOcrFilter != 'Alle') {
+      gefilterteListe = gefilterteListe.where((g) => g.ocr == _selectedOcrFilter).toList();
+    }
+
+    if (_suchbegriff.isNotEmpty) {
+      final begriff = _suchbegriff.toLowerCase();
+      gefilterteListe = gefilterteListe.where((g) =>
+      g.nummer.toLowerCase().contains(begriff) ||
+          g.modell.toLowerCase().contains(begriff) ||
+          g.seriennummer.toLowerCase().contains(begriff)
+      ).toList();
+    }
+
+    // --- ANFANG DER ÄNDERUNG: Gruppiert die gefilterte Liste nach Modell ---
+    Map<String, List<Geraet>> gruppierteGeraete = {};
+    for (var geraet in gefilterteListe) {
+      gruppierteGeraete.putIfAbsent(geraet.modell, () => []).add(geraet);
+    }
+    final sortierteModelle = gruppierteGeraete.keys.toList()..sort();
+    // --- ENDE DER ÄNDERUNG ---
+
     return Scaffold(
-      appBar: AppBar(title: Text('Bestandsliste (Lager)')),
+      appBar: AppBar(
+        title: Text('Bestandsliste (Lager)'),
+        actions: [
+          _isImporting
+              ? const Padding(
+            padding: EdgeInsets.all(16.0),
+            child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white)),
+          )
+              : IconButton(
+            icon: const Icon(Icons.upload_file),
+            tooltip: 'Geräte aus Excel importieren',
+            onPressed: _importGeraete,
+          ),
+        ],
+      ),
       body: Column(
         children: [
           Padding(
-            padding: const EdgeInsets.all(16),
-            child: TextField(
-              controller: _suchController,
-              decoration: InputDecoration(
-                labelText: 'Bestand durchsuchen...',
-                prefixIcon: Icon(Icons.search),
-                suffixIcon: _suchbegriff.isNotEmpty
-                    ? IconButton(
-                  icon: Icon(Icons.clear),
-                  onPressed: () {
-                    setState(() {
-                      _suchController.clear();
-                      _suchbegriff = '';
-                    });
-                  },
-                )
-                    : null,
-                border: OutlineInputBorder(),
-              ),
-              onChanged: (wert) =>
-                  setState(() => _suchbegriff = wert.trim()),
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+            child: Row(
+              children: [
+                Expanded(
+                  flex: 3,
+                  child: TextField(
+                    controller: _suchController,
+                    decoration: InputDecoration(labelText: 'Bestand durchsuchen...', prefixIcon: Icon(Icons.search), suffixIcon: _suchbegriff.isNotEmpty ? IconButton(icon: Icon(Icons.clear), onPressed: () { setState(() { _suchController.clear(); _suchbegriff = ''; }); }) : null, border: OutlineInputBorder()),
+                    onChanged: (wert) => setState(() => _suchbegriff = wert.trim()),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+            child: Row(
+              children: [
+                Expanded(
+                  child: DropdownButtonFormField<String>(
+                    value: _selectedEinzugFilter,
+                    decoration: const InputDecoration(labelText: 'Filter: Originaleinzug', border: OutlineInputBorder(), contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 16)),
+                    items: _einzugFilterOptionen.map((String value) => DropdownMenuItem<String>(value: value, child: Text(value))).toList(),
+                    onChanged: (newValue) => setState(() => _selectedEinzugFilter = newValue!),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: DropdownButtonFormField<String>(
+                    value: _selectedOcrFilter,
+                    decoration: const InputDecoration(labelText: 'Filter: OCR', border: OutlineInputBorder(), contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 16)),
+                    items: _ocrFilterOptionen.map((String value) => DropdownMenuItem<String>(value: value, child: Text(value))).toList(),
+                    onChanged: (newValue) => setState(() => _selectedOcrFilter = newValue!),
+                  ),
+                ),
+              ],
             ),
           ),
           Expanded(
-            child: gefilterteListe.isEmpty
-                ? Center(child: Text('Keine Geräte im Lager gefunden.'))
+            // --- GEÄNDERT: Baut jetzt die gruppierte Ansicht auf ---
+            child: gruppierteGeraete.isEmpty
+                ? Center(child: Text('Keine Geräte für die Auswahl gefunden.'))
                 : ListView.builder(
               padding: const EdgeInsets.all(16),
-              itemCount: gefilterteListe.length,
+              itemCount: sortierteModelle.length,
               itemBuilder: (ctx, index) {
-                final g = gefilterteListe[index];
+                final modell = sortierteModelle[index];
+                final geraeteInGruppe = gruppierteGeraete[modell]!;
 
                 return Card(
                   margin: const EdgeInsets.symmetric(vertical: 8),
-                  child: ListTile(
-                    leading: CircleAvatar(
-                        child: Icon(Icons.inventory_2_outlined)),
+                  child: ExpansionTile(
                     title: Text(
-                      '${g.modell} (SN: ${g.seriennummer})',
-                      style: TextStyle(fontWeight: FontWeight.bold),
+                      '$modell (${geraeteInGruppe.length} Stk.)',
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
                     ),
-                    subtitle: Text('Interne Nr: ${g.nummer}'),
-                    trailing: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        IconButton(
-                          icon: Icon(Icons.local_shipping,
-                              color: Colors.blueAccent),
-                          tooltip: 'Ausliefern',
-                          onPressed: () =>
-                              _showZuordnungsDialog(g),
+                    children: geraeteInGruppe.map((g) {
+                      return ListTile(
+                        leading: CircleAvatar(
+                          child: Text(g.nummer, textAlign: TextAlign.center),
                         ),
-                        IconButton(
-                          icon: Icon(Icons.edit,
-                              color: Colors.orange),
-                          tooltip: 'Bearbeiten',
-                          onPressed: () => Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => GeraeteAufnahmeScreen(
-                                initialGeraet: g,
-                                onSave: widget.onUpdate,
-                                onImport: (_) async {}, // ❗ hinzugefügt
-                              ),
-                            ),
-                          ),
+                        title: Text('SN: ${g.seriennummer}'),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(icon: Icon(Icons.local_shipping, color: Colors.blueAccent), tooltip: 'Ausliefern', onPressed: () => _showZuordnungsDialog(g)),
+                            IconButton(icon: Icon(Icons.edit, color: Colors.orange), tooltip: 'Bearbeiten', onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => GeraeteAufnahmeScreen(initialGeraet: g, onSave: widget.onUpdate, onImport: widget.onImport)))),
+                          ],
                         ),
-                      ],
-                    ),
+                      );
+                    }).toList(),
                   ),
                 );
               },

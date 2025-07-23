@@ -44,6 +44,74 @@ class _ZubehoerScreenState extends State<ZubehoerScreen> {
     super.dispose();
   }
 
+  // --- NEU: Funktion, um alle Bestände auf 5 zu setzen ---
+  Future<void> _setAllStockToFive() async {
+    final sicher = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Bestände zurücksetzen?'),
+        content: const Text('Sollen wirklich die Bestände ALLER Artikel in ALLEN Lagern auf 5 gesetzt werden? Diese Aktion kann nicht rückgängig gemacht werden.'),
+        actions: [
+          TextButton(child: const Text('Abbrechen'), onPressed: () => Navigator.pop(ctx, false)),
+          TextButton(child: Text('Ja, zurücksetzen', style: TextStyle(color: Colors.red)), onPressed: () => Navigator.pop(ctx, true)),
+        ],
+      ),
+    );
+
+    if (sicher == true && mounted) {
+      // Zeigt einen Lade-Indikator an
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (BuildContext context) {
+          return const Dialog(
+            child: Padding(
+              padding: EdgeInsets.all(20.0),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  CircularProgressIndicator(),
+                  SizedBox(width: 20),
+                  Text("Bestände werden aktualisiert..."),
+                ],
+              ),
+            ),
+          );
+        },
+      );
+
+      try {
+        for (final teil in widget.ersatzteile) {
+          final updatedTeil = Ersatzteil(
+            id: teil.id,
+            artikelnummer: teil.artikelnummer,
+            bezeichnung: teil.bezeichnung,
+            hersteller: teil.hersteller,
+            haendlerArtikelnummer: teil.haendlerArtikelnummer,
+            lieferant: teil.lieferant,
+            preis: teil.preis,
+            kategorie: teil.kategorie,
+            lagerbestaende: {
+              'Hauptlager': 5,
+              'Fahrzeug Patrick': 5,
+              'Fahrzeug Melanie': 5,
+            },
+          );
+          await widget.onUpdate(updatedTeil);
+        }
+        Navigator.of(context).pop(); // Schließt den Lade-Dialog
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Alle Bestände wurden auf 5 gesetzt.'), backgroundColor: Colors.green),
+        );
+      } catch (e) {
+        Navigator.of(context).pop(); // Schließt den Lade-Dialog
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Fehler beim Aktualisieren: ${e.toString()}'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
   void _stammDatenDialog({Ersatzteil? ersatzteil, bool isCopy = false}) {
     final isEdit = ersatzteil != null && !isCopy;
 
@@ -54,6 +122,10 @@ class _ZubehoerScreenState extends State<ZubehoerScreen> {
     final preisController = TextEditingController(text: isEdit || isCopy ? ersatzteil!.preis.toStringAsFixed(2) : '');
     String ausgewaehlteKategorie = ersatzteil?.kategorie ?? _kategorien.first;
     String ausgewaehlterLieferant = (isEdit || isCopy) && _lieferanten.contains(ersatzteil!.lieferant) ? ersatzteil.lieferant : 'Nichts ausgewählt';
+
+    final hauptlagerController = TextEditingController(text: (isEdit ? ersatzteil.lagerbestaende['Hauptlager'] ?? 0 : 5).toString());
+    final patrickController = TextEditingController(text: (isEdit ? ersatzteil.lagerbestaende['Fahrzeug Patrick'] ?? 0 : 5).toString());
+    final melanieController = TextEditingController(text: (isEdit ? ersatzteil.lagerbestaende['Fahrzeug Melanie'] ?? 0 : 5).toString());
 
     showDialog(
       context: context,
@@ -84,6 +156,11 @@ class _ZubehoerScreenState extends State<ZubehoerScreen> {
                 decoration: const InputDecoration(labelText: 'Preis (z.B. 99.99)'),
                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
               ),
+              const SizedBox(height: 16),
+              const Text("Lagerbestände", style: TextStyle(fontWeight: FontWeight.bold)),
+              TextField(controller: hauptlagerController, decoration: const InputDecoration(labelText: 'Hauptlager'), keyboardType: TextInputType.number),
+              TextField(controller: patrickController, decoration: const InputDecoration(labelText: 'Fahrzeug Patrick'), keyboardType: TextInputType.number),
+              TextField(controller: melanieController, decoration: const InputDecoration(labelText: 'Fahrzeug Melanie'), keyboardType: TextInputType.number),
             ],
           ),
         ),
@@ -99,6 +176,12 @@ class _ZubehoerScreenState extends State<ZubehoerScreen> {
                 return;
               }
 
+              final lagerbestaende = {
+                'Hauptlager': int.tryParse(hauptlagerController.text) ?? 0,
+                'Fahrzeug Patrick': int.tryParse(patrickController.text) ?? 0,
+                'Fahrzeug Melanie': int.tryParse(melanieController.text) ?? 0,
+              };
+
               final neuesTeil = Ersatzteil(
                 id: isEdit ? ersatzteil.id : '',
                 artikelnummer: artikelController.text.trim(),
@@ -108,7 +191,7 @@ class _ZubehoerScreenState extends State<ZubehoerScreen> {
                 lieferant: ausgewaehlterLieferant == 'Nichts ausgewählt' ? '' : ausgewaehlterLieferant,
                 preis: preis,
                 kategorie: ausgewaehlteKategorie,
-                lagerbestaende: isEdit ? ersatzteil.lagerbestaende : null,
+                lagerbestaende: lagerbestaende,
               );
 
               if (isEdit) {
@@ -175,6 +258,12 @@ class _ZubehoerScreenState extends State<ZubehoerScreen> {
       appBar: AppBar(
         title: Text(isLagerAnsicht ? 'Bestand: ${widget.angezeigtesLager}' : 'Stammdaten'),
         actions: isLagerAnsicht ? [] : [
+          // --- NEU: Button zum Zurücksetzen der Bestände ---
+          IconButton(
+            icon: const Icon(Icons.inventory_2_outlined),
+            tooltip: 'Alle Bestände auf 5 setzen',
+            onPressed: _setAllStockToFive,
+          ),
           IconButton(
             icon: const Icon(Icons.add),
             tooltip: 'Neues Ersatzteil',
@@ -203,13 +292,11 @@ class _ZubehoerScreenState extends State<ZubehoerScreen> {
               children: sortierteKategorien.map((kategorie) {
                 final teile = gruppiert[kategorie]!;
 
-                // --- ANFANG DER ÄNDERUNG ---
                 final int anzahl = isLagerAnsicht
                     ? teile.fold(0, (sum, teil) => sum + (teil.lagerbestaende[widget.angezeigtesLager!] ?? 0))
                     : teile.length;
 
                 final String einheit = isLagerAnsicht ? 'Stk.' : 'Artikel';
-                // --- ENDE DER ÄNDERUNG ---
 
                 return Card(
                   margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
