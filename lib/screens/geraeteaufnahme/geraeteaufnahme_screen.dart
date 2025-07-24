@@ -13,12 +13,14 @@ class GeraeteAufnahmeScreen extends StatefulWidget {
   final Geraet? initialGeraet;
   final Future<void> Function(Geraet) onSave;
   final Future<void> Function(List<Geraet>) onImport;
+  final List<Geraet> alleGeraete; // <-- HINZUGEFÜGT
 
   const GeraeteAufnahmeScreen({
     Key? key,
     this.initialGeraet,
     required this.onSave,
     required this.onImport,
+    required this.alleGeraete, // <-- HINZUGEFÜGT
   }) : super(key: key);
 
   @override
@@ -131,12 +133,29 @@ class _GeraeteAufnahmeScreenState extends State<GeraeteAufnahmeScreen> {
 
   @override
   void dispose() {
-    // ... dispose all controllers ...
+    _nummerController.dispose();
+    _seriennummerController.dispose();
+    _lieferantController.dispose();
+    _originaleinzugSNController.dispose();
+    _unterschrankSNController.dispose();
+    _finisherSNController.dispose();
+    _faxSNController.dispose();
+    _zaehlerGesamtController.dispose();
+    _zaehlerSWController.dispose();
+    _zaehlerColorController.dispose();
+    _fach1Controller.dispose();
+    _fach2Controller.dispose();
+    _fach3Controller.dispose();
+    _fach4Controller.dispose();
+    _bypassController.dispose();
+    _dokumenteneinzugController.dispose();
+    _duplexController.dispose();
+    _bemerkungController.dispose();
     super.dispose();
   }
 
   Future<void> _importGeraete() async {
-    // ... import logic ...
+    // Import-Logik hier...
   }
 
   void _updateZaehlerGesamt() {
@@ -148,7 +167,27 @@ class _GeraeteAufnahmeScreenState extends State<GeraeteAufnahmeScreen> {
   }
 
   void _saveGeraet() async {
-    if (_nummerController.text.trim().isEmpty || _selectedModell == 'Nichts ausgewählt') {
+    // --- ANFANG DER PRÜFLOGIK ---
+    final neueNummer = _nummerController.text.trim();
+
+    // Prüfen, ob ein ANDERES Gerät diese Nummer bereits verwendet.
+    final istDuplikat = widget.alleGeraete.any((geraet) =>
+    geraet.nummer == neueNummer && // Nummer ist identisch UND...
+        geraet.id != widget.initialGeraet?.id // ...es ist nicht das Gerät, das wir gerade bearbeiten.
+    );
+
+    if (istDuplikat) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Diese Gerätenummer ist bereits vergeben!'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return; // Die Funktion hier abbrechen
+    }
+    // --- ENDE DER PRÜFLOGIK ---
+
+    if (neueNummer.isEmpty || _selectedModell == 'Nichts ausgewählt') {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Bitte Gerätenummer und Modell angeben!')));
       return;
     }
@@ -205,7 +244,7 @@ class _GeraeteAufnahmeScreenState extends State<GeraeteAufnahmeScreen> {
 
     await widget.onSave(neuesGeraet);
 
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Gerät erfolgreich gespeichert!')));
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Gerät erfolgreich gespeichert!')));
     Navigator.of(context).pop();
   }
 
@@ -218,7 +257,6 @@ class _GeraeteAufnahmeScreenState extends State<GeraeteAufnahmeScreen> {
     }
   }
 
-  // --- NEU: Hilfs-Widget für die Auswahl-Chips ---
   Widget _buildChoiceChipRow(String label, String groupValue, ValueChanged<String> onSelected) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8.0),
@@ -229,17 +267,17 @@ class _GeraeteAufnahmeScreenState extends State<GeraeteAufnahmeScreen> {
           Row(
             children: [
               ChoiceChip(
-                label: Text('Ja'),
+                label: const Text('Ja'),
                 selected: groupValue == 'Ja',
-                onSelected: (selected) { if(selected) onSelected('Ja'); },
+                onSelected: (selected) { if (selected) onSelected('Ja'); },
                 selectedColor: Theme.of(context).primaryColor,
                 labelStyle: TextStyle(color: groupValue == 'Ja' ? Colors.white : Colors.black),
               ),
-              SizedBox(width: 8),
+              const SizedBox(width: 8),
               ChoiceChip(
-                label: Text('Nein'),
+                label: const Text('Nein'),
                 selected: groupValue == 'Nein',
-                onSelected: (selected) { if(selected) onSelected('Nein'); },
+                onSelected: (selected) { if (selected) onSelected('Nein'); },
                 selectedColor: Theme.of(context).primaryColor,
                 labelStyle: TextStyle(color: groupValue == 'Nein' ? Colors.white : Colors.black),
               ),
@@ -284,51 +322,38 @@ class _GeraeteAufnahmeScreenState extends State<GeraeteAufnahmeScreen> {
               ListTile(
                 contentPadding: EdgeInsets.zero,
                 title: Text("Aufnahmedatum: ${DateFormat('dd.MM.yyyy').format(_selectedAufnahmeDatum ?? DateTime.now())}"),
-                trailing: Icon(Icons.calendar_today),
+                trailing: const Icon(Icons.calendar_today),
                 onTap: () => _selectDate(context),
               ),
               TextFormField(controller: _lieferantController, decoration: const InputDecoration(labelText: 'Lieferant')),
               const Divider(height: 32),
-
               DropdownButtonFormField<String>(value: _selectedModell, decoration: const InputDecoration(labelText: 'Modell*'), items: _modellOptionen.map((m) => DropdownMenuItem(value: m, child: Text(m))).toList(), onChanged: (val) => setState(() => _selectedModell = val ?? 'Nichts ausgewählt')),
               TextFormField(controller: _seriennummerController, decoration: const InputDecoration(labelText: 'Seriennummer')),
-
-              // --- ANFANG DER ÄNDERUNG: Dropdowns durch ChoiceChips ersetzt ---
               _buildChoiceChipRow('I-Option', _selectedIOption, (val) => setState(() => _selectedIOption = val)),
               DropdownButtonFormField<String>(value: _selectedPdfTyp, decoration: const InputDecoration(labelText: 'PDF Typ'), items: _pdfTypen.map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(), onChanged: (val) => setState(() => _selectedPdfTyp = val ?? 'Nichts ausgewählt')),
               _buildChoiceChipRow('Durchsuchbar', _selectedDurchsuchbar, (val) => setState(() => _selectedDurchsuchbar = val)),
               _buildChoiceChipRow('OCR', _selectedOcr, (val) => setState(() => _selectedOcr = val)),
-              // --- ENDE DER ÄNDERUNG ---
-
               const SizedBox(height: 22),
-
               const Text('Zubehör:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
               ZubehoerEingabeZeile(label: 'Originaleinzug Typ', selectedValue: _selectedOriginaleinzugTyp, options: _originaleinzugTypOptionen, snController: _originaleinzugSNController, onChanged: (val) => setState(() => _selectedOriginaleinzugTyp = val ?? 'Nichts ausgewählt')),
               ZubehoerEingabeZeile(label: 'Unterschrank Typ', selectedValue: _selectedUnterschrankTyp, options: _unterschrankTypOptionen, snController: _unterschrankSNController, onChanged: (val) => setState(() => _selectedUnterschrankTyp = val ?? 'Nichts ausgewählt')),
               ZubehoerEingabeZeile(label: 'Finisher', selectedValue: _selectedFinisher, options: _finisherOptionen, snController: _finisherSNController, onChanged: (val) => setState(() => _selectedFinisher = val ?? 'Nichts ausgewählt'), showSnField: showFinisherSN),
               ZubehoerEingabeZeile(label: 'Fax', selectedValue: _selectedFax, options: _jaNeinOptionen, snController: _faxSNController, onChanged: (val) => setState(() => _selectedFax = val ?? 'Nichts ausgewählt'), showSnField: showFaxSN),
-
               const SizedBox(height: 22),
               const Text('Zählerstände:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
               ZaehlerstaendeEingabe(swController: _zaehlerSWController, colorController: _zaehlerColorController, gesamtController: _zaehlerGesamtController, onUpdate: _updateZaehlerGesamt),
-
               const SizedBox(height: 22),
-
               const Text('Füllstände (in %):', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
               const SizedBox(height: 8),
               Row(children: [ProzentDropdown(label: 'RTB', value: _rtb, onChanged: (val) => setState(() => _rtb = val ?? 0)), const SizedBox(width: 8), ProzentDropdown(label: 'Toner K', value: _tonerK, onChanged: (val) => setState(() => _tonerK = val ?? 0)), const SizedBox(width: 8), ProzentDropdown(label: 'Toner C', value: _tonerC, onChanged: (val) => setState(() => _tonerC = val ?? 0)), const SizedBox(width: 8), ProzentDropdown(label: 'Toner M', value: _tonerM, onChanged: (val) => setState(() => _tonerM = val ?? 0)), const SizedBox(width: 8), ProzentDropdown(label: 'Toner Y', value: _tonerY, onChanged: (val) => setState(() => _tonerY = val ?? 0))]),
-
               const SizedBox(height: 22),
               const Text('Laufzeiten Bildeinheit (jeweils %):', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
               Row(children: [ProzentDropdown(label: 'K', value: _laufzeitBildeinheitK, onChanged: (val) => setState(() => _laufzeitBildeinheitK = val ?? 0)), const SizedBox(width: 8), ProzentDropdown(label: 'C', value: _laufzeitBildeinheitC, onChanged: (val) => setState(() => _laufzeitBildeinheitC = val ?? 0)), const SizedBox(width: 8), ProzentDropdown(label: 'M', value: _laufzeitBildeinheitM, onChanged: (val) => setState(() => _laufzeitBildeinheitM = val ?? 0)), const SizedBox(width: 8), ProzentDropdown(label: 'Y', value: _laufzeitBildeinheitY, onChanged: (val) => setState(() => _laufzeitBildeinheitY = val ?? 0))]),
-
               const SizedBox(height: 22),
               const Text('Laufzeiten Entwickler (jeweils %):', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
               Row(children: [ProzentDropdown(label: 'K', value: _laufzeitEntwicklerK, onChanged: (val) => setState(() => _laufzeitEntwicklerK = val ?? 0)), const SizedBox(width: 8), ProzentDropdown(label: 'C', value: _laufzeitEntwicklerC, onChanged: (val) => setState(() => _laufzeitEntwicklerC = val ?? 0)), const SizedBox(width: 8), ProzentDropdown(label: 'M', value: _laufzeitEntwicklerM, onChanged: (val) => setState(() => _laufzeitEntwicklerM = val ?? 0)), const SizedBox(width: 8), ProzentDropdown(label: 'Y', value: _laufzeitEntwicklerY, onChanged: (val) => setState(() => _laufzeitEntwicklerY = val ?? 0))]),
-
               const SizedBox(height: 22),
               Row(children: [ProzentDropdown(label: 'Fixiereinheit', value: _laufzeitFixiereinheit, onChanged: (val) => setState(() => _laufzeitFixiereinheit = val ?? 0)), const SizedBox(width: 8), ProzentDropdown(label: 'Transferbelt', value: _laufzeitTransferbelt, onChanged: (val) => setState(() => _laufzeitTransferbelt = val ?? 0))]),
-
               const SizedBox(height: 22),
               const Text('Testergebnisse und Zustand', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
               TestergebnisseEingabe(
@@ -340,7 +365,6 @@ class _GeraeteAufnahmeScreenState extends State<GeraeteAufnahmeScreen> {
                 dokumenteneinzugController: _dokumenteneinzugController,
                 duplexController: _duplexController,
               ),
-
               const SizedBox(height: 22),
               TextFormField(controller: _bemerkungController, decoration: const InputDecoration(labelText: 'Bemerkung (frei)', alignLabelWithHint: true), minLines: 2, maxLines: 4),
               const SizedBox(height: 22),

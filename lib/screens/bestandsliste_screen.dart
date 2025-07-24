@@ -9,7 +9,7 @@ import 'geraeteaufnahme/geraeteaufnahme_screen.dart';
 class BestandslisteScreen extends StatefulWidget {
   final List<Geraet> alleGeraete;
   final Future<void> Function(Geraet) onUpdate;
-  final Future<void> Function(String) onDelete;
+  final Future<void> Function(String) onDelete; // Nimmt die ID des Geräts entgegen
   final List<Kunde> kunden;
   final List<Standort> standorte;
   final Future<void> Function(Geraet, Kunde, Standort) onAssign;
@@ -183,6 +183,38 @@ class _BestandslisteScreenState extends State<BestandslisteScreen> {
     );
   }
 
+  void _showDeleteConfirmationDialog(Geraet geraet) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Löschen bestätigen'),
+        content: Text('Sind Sie sicher, dass Sie das Gerät "${geraet.modell}" (SN: ${geraet.seriennummer}) endgültig löschen möchten?'),
+        actions: <Widget>[
+          TextButton(
+            child: const Text('Abbrechen'),
+            onPressed: () {
+              Navigator.of(ctx).pop();
+            },
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Löschen'),
+            onPressed: () async {
+              Navigator.of(ctx).pop();
+              await widget.onDelete(geraet.id);
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Gerät wurde gelöscht.'), backgroundColor: Colors.green),
+                );
+              }
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+
   @override
   Widget build(BuildContext context) {
     List<Geraet> gefilterteListe = widget.alleGeraete.where((g) => g.status == 'Im Lager').toList();
@@ -204,17 +236,29 @@ class _BestandslisteScreenState extends State<BestandslisteScreen> {
       ).toList();
     }
 
-    // --- ANFANG DER ÄNDERUNG: Gruppiert die gefilterte Liste nach Modell ---
     Map<String, List<Geraet>> gruppierteGeraete = {};
     for (var geraet in gefilterteListe) {
       gruppierteGeraete.putIfAbsent(geraet.modell, () => []).add(geraet);
     }
+
+    // --- ANFANG DER SORTIERFUNKTION ---
+    // Jede Liste innerhalb der Gruppe wird nach dem Zählerstand sortiert.
+    gruppierteGeraete.forEach((modell, geraeteListe) {
+      geraeteListe.sort((a, b) {
+        // Zählerstände werden in Zahlen umgewandelt, um korrekt zu vergleichen.
+        // Geräte ohne Angabe (oder mit ungültiger) werden ans Ende sortiert.
+        final zaehlerA = int.tryParse(a.zaehlerGesamt) ?? 9999999;
+        final zaehlerB = int.tryParse(b.zaehlerGesamt) ?? 9999999;
+        return zaehlerA.compareTo(zaehlerB);
+      });
+    });
+    // --- ENDE DER SORTIERFUNKTION ---
+
     final sortierteModelle = gruppierteGeraete.keys.toList()..sort();
-    // --- ENDE DER ÄNDERUNG ---
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('Bestandsliste (Lager)'),
+        title: const Text('Bestandsliste (Lager)'),
         actions: [
           _isImporting
               ? const Padding(
@@ -238,7 +282,7 @@ class _BestandslisteScreenState extends State<BestandslisteScreen> {
                   flex: 3,
                   child: TextField(
                     controller: _suchController,
-                    decoration: InputDecoration(labelText: 'Bestand durchsuchen...', prefixIcon: Icon(Icons.search), suffixIcon: _suchbegriff.isNotEmpty ? IconButton(icon: Icon(Icons.clear), onPressed: () { setState(() { _suchController.clear(); _suchbegriff = ''; }); }) : null, border: OutlineInputBorder()),
+                    decoration: InputDecoration(labelText: 'Bestand durchsuchen...', prefixIcon: const Icon(Icons.search), suffixIcon: _suchbegriff.isNotEmpty ? IconButton(icon: const Icon(Icons.clear), onPressed: () { setState(() { _suchController.clear(); _suchbegriff = ''; }); }) : null, border: const OutlineInputBorder()),
                     onChanged: (wert) => setState(() => _suchbegriff = wert.trim()),
                   ),
                 ),
@@ -270,12 +314,15 @@ class _BestandslisteScreenState extends State<BestandslisteScreen> {
             ),
           ),
           Expanded(
-            // --- GEÄNDERT: Baut jetzt die gruppierte Ansicht auf ---
             child: gruppierteGeraete.isEmpty
-                ? Center(child: Text('Keine Geräte für die Auswahl gefunden.'))
-                : ListView.builder(
+                ? const Center(child: Text('Keine Geräte für die Auswahl gefunden.'))
+                : ListView.separated(
               padding: const EdgeInsets.all(16),
               itemCount: sortierteModelle.length,
+              separatorBuilder: (context, index) => const Divider(
+                color: Colors.green,
+                thickness: 1,
+              ),
               itemBuilder: (ctx, index) {
                 final modell = sortierteModelle[index];
                 final geraeteInGruppe = gruppierteGeraete[modell]!;
@@ -283,6 +330,7 @@ class _BestandslisteScreenState extends State<BestandslisteScreen> {
                 return Card(
                   margin: const EdgeInsets.symmetric(vertical: 8),
                   child: ExpansionTile(
+                    initiallyExpanded: true,
                     title: Text(
                       '$modell (${geraeteInGruppe.length} Stk.)',
                       style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
@@ -292,12 +340,42 @@ class _BestandslisteScreenState extends State<BestandslisteScreen> {
                         leading: CircleAvatar(
                           child: Text(g.nummer, textAlign: TextAlign.center),
                         ),
-                        title: Text('SN: ${g.seriennummer}'),
+                        title: Row(
+                          children: [
+                            Text('SN: ${g.seriennummer}'),
+                            const SizedBox(width: 24), // Fester Abstand
+                            Text(
+                              'Zähler: ${g.zaehlerGesamt.isNotEmpty ? g.zaehlerGesamt : 'k.A.'}',
+                              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                            ),
+                            const SizedBox(width: 24), // Fester Abstand
+                            Text(
+                              g.originaleinzugTyp.isNotEmpty ? g.originaleinzugTyp : 'k.A.',
+                              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.blueAccent),
+                            ),
+                          ],
+                        ),
                         trailing: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            IconButton(icon: Icon(Icons.local_shipping, color: Colors.blueAccent), tooltip: 'Ausliefern', onPressed: () => _showZuordnungsDialog(g)),
-                            IconButton(icon: Icon(Icons.edit, color: Colors.orange), tooltip: 'Bearbeiten', onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => GeraeteAufnahmeScreen(initialGeraet: g, onSave: widget.onUpdate, onImport: widget.onImport)))),
+                            IconButton(icon: const Icon(Icons.local_shipping, color: Colors.blueAccent), tooltip: 'Ausliefern', onPressed: () => _showZuordnungsDialog(g)),
+                            IconButton(
+                              icon: const Icon(Icons.edit, color: Colors.orange),
+                              tooltip: 'Bearbeiten',
+                              onPressed: () => Navigator.push(context, MaterialPageRoute(
+                                builder: (_) => GeraeteAufnahmeScreen(
+                                  initialGeraet: g,
+                                  onSave: widget.onUpdate,
+                                  onImport: widget.onImport,
+                                  alleGeraete: widget.alleGeraete,
+                                ),
+                              )),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.delete, color: Colors.redAccent),
+                              tooltip: 'Löschen',
+                              onPressed: () => _showDeleteConfirmationDialog(g),
+                            ),
                           ],
                         ),
                       );

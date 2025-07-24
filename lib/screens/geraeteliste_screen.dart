@@ -46,7 +46,6 @@ class _GeraeteListeScreenState extends State<GeraeteListeScreen> {
     return value.toString();
   }
 
-  // --- ANFANG DER ÄNDERUNG: Filtert jetzt nur noch ausgelieferte Geräte ---
   List<Geraet> get _gefilterteGeraete {
     // 1. Filtert die Gesamtliste, um nur Geräte zu erhalten, die ausgeliefert wurden (keine interne Nummer mehr haben)
     final ausgelieferteGeraete = widget.geraete.where((g) => g.nummer.isEmpty).toList();
@@ -64,29 +63,46 @@ class _GeraeteListeScreenState extends State<GeraeteListeScreen> {
       ).toList();
     }
   }
-  // --- ENDE DER ÄNDERUNG ---
 
   Future<void> _druckeGeraetAsPdf(Geraet g) async {
-    // PDF Logic remains unchanged
+    final pdf = pw.Document();
+    pdf.addPage(
+      pw.Page(
+        build: (pw.Context context) {
+          return pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              pw.Text('Datenblatt: ${g.modell}', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 20)),
+              pw.SizedBox(height: 20),
+              pw.Text('Seriennummer: ${g.seriennummer}'),
+              pw.Text('Kunde: ${g.kundeName ?? 'N/A'}'),
+              pw.Text('Standort: ${g.standortName ?? 'N/A'}'),
+              // Hier weitere Details hinzufügen
+            ],
+          );
+        },
+      ),
+    );
+    await Printing.layoutPdf(onLayout: (PdfPageFormat format) async => pdf.save());
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('Geräteliste (Ausgeliefert)')),
+      appBar: AppBar(title: const Text('Geräteliste (Ausgeliefert)')),
       body: Column(
         children: [
           Padding(
             padding: const EdgeInsets.all(16),
             child: TextField(
               controller: _suchController,
-              decoration: InputDecoration(labelText: 'Suche (Modell, SN, Kunde...)', prefixIcon: Icon(Icons.search), suffixIcon: _suchbegriff.isNotEmpty ? IconButton(icon: Icon(Icons.clear), onPressed: () { setState(() { _suchController.clear(); _suchbegriff = ''; }); }) : null, border: OutlineInputBorder()),
+              decoration: InputDecoration(labelText: 'Suche (Modell, SN, Kunde...)', prefixIcon: const Icon(Icons.search), suffixIcon: _suchbegriff.isNotEmpty ? IconButton(icon: const Icon(Icons.clear), onPressed: () { setState(() { _suchController.clear(); _suchbegriff = ''; }); }) : null, border: const OutlineInputBorder()),
               onChanged: (wert) => setState(() => _suchbegriff = wert.trim()),
             ),
           ),
           Expanded(
             child: _gefilterteGeraete.isEmpty
-                ? Center(child: Text('Keine ausgelieferten Geräte gefunden.'))
+                ? const Center(child: Text('Keine ausgelieferten Geräte gefunden.'))
                 : ListView.builder(
               padding: const EdgeInsets.all(16),
               itemCount: _gefilterteGeraete.length,
@@ -97,22 +113,35 @@ class _GeraeteListeScreenState extends State<GeraeteListeScreen> {
                   margin: const EdgeInsets.symmetric(vertical: 10),
                   elevation: 3,
                   child: ExpansionTile(
-                    title: Text('${g.modell} (SN: ${g.seriennummer})', style: TextStyle(fontWeight: FontWeight.bold)),
-                    subtitle: Text('Kunde: ${g.kundeName ?? ''} - ${g.standortName ?? ''}', style: TextStyle(color: Colors.blue)),
+                    title: Text('${g.modell} (SN: ${g.seriennummer})', style: const TextStyle(fontWeight: FontWeight.bold)),
+                    subtitle: Text('Kunde: ${g.kundeName ?? ''} - ${g.standortName ?? ''}', style: const TextStyle(color: Colors.blue)),
                     children: [
-                      Divider(),
+                      const Divider(),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.end,
                         children: [
-                          IconButton(icon: Icon(Icons.edit, color: Colors.orange), tooltip: 'Bearbeiten', onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => GeraeteAufnahmeScreen(initialGeraet: g, onSave: widget.onUpdate, onImport: widget.onImport)))),
-                          IconButton(icon: Icon(Icons.delete, color: Colors.red), tooltip: 'Löschen', onPressed: () async {
-                            final sicher = await showDialog<bool>(context: context, builder: (ctx) => AlertDialog(title: Text('Löschen bestätigen'), content: Text('Gerät "${g.modell}" wirklich löschen?'), actions: [TextButton(child: Text('Abbrechen'), onPressed: () => Navigator.pop(ctx, false)), TextButton(child: Text('Löschen', style: TextStyle(color: Colors.red)), onPressed: () => Navigator.pop(ctx, true))]));
+                          IconButton(
+                            icon: const Icon(Icons.edit, color: Colors.orange),
+                            tooltip: 'Bearbeiten',
+                            // --- ANFANG DER KORREKTUR ---
+                            onPressed: () => Navigator.push(context, MaterialPageRoute(
+                              builder: (_) => GeraeteAufnahmeScreen(
+                                initialGeraet: g,
+                                onSave: widget.onUpdate,
+                                onImport: widget.onImport,
+                                alleGeraete: widget.geraete, // Dieser Parameter wurde hinzugefügt
+                              ),
+                            )),
+                            // --- ENDE DER KORREKTUR ---
+                          ),
+                          IconButton(icon: const Icon(Icons.delete, color: Colors.red), tooltip: 'Löschen', onPressed: () async {
+                            final sicher = await showDialog<bool>(context: context, builder: (ctx) => AlertDialog(title: const Text('Löschen bestätigen'), content: Text('Gerät "${g.modell}" wirklich löschen?'), actions: [TextButton(child: const Text('Abbrechen'), onPressed: () => Navigator.pop(ctx, false)), TextButton(child: const Text('Löschen', style: TextStyle(color: Colors.red)), onPressed: () => Navigator.pop(ctx, true))]));
                             if (sicher == true) { await widget.onDelete(g.id); }
                           }),
                           IconButton(icon: Icon(Icons.print, color: Colors.grey[700]), tooltip: 'Datenblatt drucken', onPressed: () => _druckeGeraetAsPdf(g)),
                         ],
                       ),
-                      SizedBox(height: 8),
+                      const SizedBox(height: 8),
                     ],
                   ),
                 );

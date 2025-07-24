@@ -80,7 +80,18 @@ class AuswahlScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final List<Map<String, dynamic>> arbeitsablaeufe = [
-      {'title': 'Geräteaufnahme', 'icon': Icons.add_box, 'color': Colors.blue, 'onTap': () => Navigator.push(context, MaterialPageRoute(builder: (_) => GeraeteAufnahmeScreen(onSave: onAddGeraet, onImport: onImportGeraete)))},
+      {
+        'title': 'Geräteaufnahme',
+        'icon': Icons.add_box,
+        'color': Colors.blue,
+        'onTap': () => Navigator.push(context, MaterialPageRoute(
+          builder: (_) => GeraeteAufnahmeScreen(
+            onSave: onAddGeraet,
+            onImport: onImportGeraete,
+            alleGeraete: geraete, // <-- HINZUGEFÜGT
+          ),
+        )),
+      },
       {'title': 'Aufbereitung', 'icon': Icons.build, 'color': Colors.deepPurple, 'onTap': () => Navigator.push(context, MaterialPageRoute(builder: (_) => AufbereitungScreen(alleGeraete: geraete, alleErsatzteile: ersatzteile, verbauteTeile: verbauteTeile, onTeilVerbauen: onTeilVerbauen, onDeleteVerbautesTeil: onDeleteVerbautesTeil, onUpdateVerbautesTeil: onUpdateVerbautesTeil)))},
       {'title': 'Service', 'icon': Icons.miscellaneous_services, 'color': Colors.orange, 'onTap': () => Navigator.push(context, MaterialPageRoute(builder: (_) => ServiceScreen(alleGeraete: geraete, alleErsatzteile: ersatzteile, verbauteTeile: verbauteTeile, onTeilVerbauen: onTeilVerbauen, onDeleteVerbautesTeil: onDeleteVerbautesTeil, onUpdateVerbautesTeil: onUpdateVerbautesTeil)))},
     ];
