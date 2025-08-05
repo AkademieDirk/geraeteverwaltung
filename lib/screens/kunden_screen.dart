@@ -3,7 +3,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:excel/excel.dart';
 import '../models/kunde.dart';
 import '../models/standort.dart';
-import 'standort_screen.dart';
+import 'kunden_detail_screen.dart';
 
 class KundenScreen extends StatefulWidget {
   final List<Kunde> kunden;
@@ -56,6 +56,7 @@ class _KundenScreenState extends State<KundenScreen> {
   }
 
   Future<void> _importKunden() async {
+    // Diese Funktion bleibt unverändert
     setState(() => _isImporting = true);
     try {
       FilePickerResult? result = await FilePicker.platform.pickFiles(
@@ -83,6 +84,9 @@ class _KundenScreenState extends State<KundenScreen> {
               ansprechpartner: row.length > 2 ? row[2]?.value?.toString().trim() ?? '' : '',
               telefon: row.length > 3 ? row[3]?.value?.toString().trim() ?? '' : '',
               email: row.length > 4 ? row[4]?.value?.toString().trim() ?? '' : '',
+              strasse: row.length > 5 ? row[5]?.value?.toString().trim() ?? '' : '',
+              plz: row.length > 6 ? row[6]?.value?.toString().trim() ?? '' : '',
+              ort: row.length > 7 ? row[7]?.value?.toString().trim() ?? '' : '',
             ));
           }
         }
@@ -107,26 +111,28 @@ class _KundenScreenState extends State<KundenScreen> {
     }
   }
 
-  void _kundenDialog({Kunde? kunde}) {
+  void _kundenAnlegenDialog() {
     showDialog(
       context: context,
-      builder: (ctx) => KundenDialog(
-        kunde: kunde,
+      builder: (ctx) => KundenAnlegenDialog(
         onAdd: widget.onAdd,
-        onUpdate: widget.onUpdate,
       ),
     );
   }
 
   void _deleteKunde(Kunde kunde) async {
+    // Diese Funktion bleibt unverändert
     final sicher = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Wirklich löschen?'),
-        content: Text('Kunde "${kunde.name}" wirklich löschen?'),
+        content: Text('Soll der Kunde "${kunde.name}" und alle zugehörigen Standorte wirklich gelöscht werden?'),
         actions: [
           TextButton(child: const Text('Abbrechen'), onPressed: () => Navigator.pop(ctx, false)),
-          TextButton(child: Text('Löschen', style: TextStyle(color: Colors.red)), onPressed: () => Navigator.pop(ctx, true)),
+          ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+              child: const Text('Löschen'),
+              onPressed: () => Navigator.pop(ctx, true)),
         ],
       ),
     );
@@ -192,20 +198,38 @@ class _KundenScreenState extends State<KundenScreen> {
                 return Card(
                   child: ExpansionTile(
                     title: Text(kunde.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-                    subtitle: Text('KNr: ${kunde.kundennummer}'),
+                    // --- SUBTITLE ANGEPASST ---
+                    subtitle: Text('KNr: ${kunde.kundennummer} | ${kunde.ort.isNotEmpty ? kunde.ort : 'Kein Hauptsitz'}'),
                     leading: CircleAvatar(child: Text(kunde.name.substring(0, 1).toUpperCase())),
                     trailing: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        IconButton(icon: const Icon(Icons.edit, color: Colors.orange), onPressed: () => _kundenDialog(kunde: kunde)),
+                        IconButton(
+                          icon: const Icon(Icons.edit, color: Colors.orange),
+                          onPressed: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => KundenDetailScreen(
+                                kunde: kunde,
+                                alleStandorte: widget.standorte,
+                                onUpdateKunde: widget.onUpdate,
+                                onAddStandort: widget.onAddStandort,
+                                onUpdateStandort: widget.onUpdateStandort,
+                                onDeleteStandort: widget.onDeleteStandort,
+                              ),
+                            ),
+                          ),
+                        ),
                         IconButton(icon: const Icon(Icons.delete, color: Colors.red), onPressed: () => _deleteKunde(kunde)),
                       ],
                     ),
-                    children: [
-                      _buildDetailRow(Icons.person, 'Ansprechpartner', kunde.ansprechpartner),
-                      _buildDetailRow(Icons.phone, 'Telefon', kunde.telefon),
-                      _buildDetailRow(Icons.email, 'E-Mail', kunde.email),
-                    ],
+                    children: kundenStandorte.map((standort) {
+                      return ListTile(
+                        leading: const Icon(Icons.location_city, color: Colors.grey),
+                        title: Text(standort.name),
+                        subtitle: Text('${standort.strasse}, ${standort.plz} ${standort.ort}'),
+                      );
+                    }).toList(),
                   ),
                 );
               },
@@ -215,7 +239,7 @@ class _KundenScreenState extends State<KundenScreen> {
       ),
       floatingActionButton: FloatingActionButton(
         child: const Icon(Icons.add),
-        onPressed: () => _kundenDialog(),
+        onPressed: () => _kundenAnlegenDialog(),
         tooltip: 'Neuer Kunde',
       ),
     );
@@ -245,58 +269,34 @@ class _KundenScreenState extends State<KundenScreen> {
       ),
     );
   }
-
-  Widget _buildDetailRow(IconData icon, String label, String value) {
-    if (value.isEmpty) return const SizedBox.shrink();
-    return ListTile(
-      leading: Icon(icon, color: Colors.grey.shade600),
-      title: Text(label),
-      subtitle: Text(value),
-    );
-  }
 }
-class KundenDialog extends StatefulWidget {
-  final Kunde? kunde;
+
+class KundenAnlegenDialog extends StatefulWidget {
   final Future<void> Function(Kunde, Standort) onAdd;
-  final Future<void> Function(Kunde) onUpdate;
 
-  const KundenDialog({
-    Key? key,
-    this.kunde,
-    required this.onAdd,
-    required this.onUpdate,
-  }) : super(key: key);
+  const KundenAnlegenDialog({ Key? key, required this.onAdd,}) : super(key: key);
 
   @override
-  _KundenDialogState createState() => _KundenDialogState();
+  _KundenAnlegenDialogState createState() => _KundenAnlegenDialogState();
 }
 
-class _KundenDialogState extends State<KundenDialog> {
+class _KundenAnlegenDialogState extends State<KundenAnlegenDialog> {
   final _formKey = GlobalKey<FormState>();
+  final _nummerController = TextEditingController();
+  final _nameController = TextEditingController();
+  final _ansprechpartnerController = TextEditingController();
+  final _telefonController = TextEditingController();
+  final _emailController = TextEditingController();
+  // --- NEUE CONTROLLER FÜR KUNDEN-HAUPTSITZ ---
+  final _kundeStrasseController = TextEditingController();
+  final _kundePlzController = TextEditingController();
+  final _kundeOrtController = TextEditingController();
+  final _kundeBemerkungController = TextEditingController();
 
-  final TextEditingController _nummerController = TextEditingController();
-  final TextEditingController _nameController = TextEditingController();
-  final TextEditingController _ansprechpartnerController = TextEditingController();
-  final TextEditingController _telefonController = TextEditingController();
-  final TextEditingController _emailController = TextEditingController();
-  final TextEditingController _standortNameController = TextEditingController();
-  final TextEditingController _strasseController = TextEditingController();
-  final TextEditingController _plzController = TextEditingController();
-  final TextEditingController _ortController = TextEditingController();
-
-  bool get isEdit => widget.kunde != null;
-
-  @override
-  void initState() {
-    super.initState();
-    if (isEdit) {
-      _nummerController.text = widget.kunde!.kundennummer;
-      _nameController.text = widget.kunde!.name;
-      _ansprechpartnerController.text = widget.kunde!.ansprechpartner;
-      _telefonController.text = widget.kunde!.telefon;
-      _emailController.text = widget.kunde!.email;
-    }
-  }
+  final _standortNameController = TextEditingController();
+  final _standortStrasseController = TextEditingController();
+  final _standortPlzController = TextEditingController();
+  final _standortOrtController = TextEditingController();
 
   @override
   void dispose() {
@@ -305,45 +305,46 @@ class _KundenDialogState extends State<KundenDialog> {
     _ansprechpartnerController.dispose();
     _telefonController.dispose();
     _emailController.dispose();
+    _kundeStrasseController.dispose();
+    _kundePlzController.dispose();
+    _kundeOrtController.dispose();
+    _kundeBemerkungController.dispose();
     _standortNameController.dispose();
-    _strasseController.dispose();
-    _plzController.dispose();
-    _ortController.dispose();
+    _standortStrasseController.dispose();
+    _standortPlzController.dispose();
+    _standortOrtController.dispose();
     super.dispose();
   }
 
   void _submit() async {
     if (_formKey.currentState!.validate()) {
       final neuerKunde = Kunde(
-        id: isEdit ? widget.kunde!.id : '',
         kundennummer: _nummerController.text.trim(),
         name: _nameController.text.trim(),
         ansprechpartner: _ansprechpartnerController.text.trim(),
         telefon: _telefonController.text.trim(),
         email: _emailController.text.trim(),
+        // --- NEUE FELDER ZUWEISEN ---
+        strasse: _kundeStrasseController.text.trim(),
+        plz: _kundePlzController.text.trim(),
+        ort: _kundeOrtController.text.trim(),
+        bemerkung: _kundeBemerkungController.text.trim(),
       );
 
-      if (isEdit) {
-        await widget.onUpdate(neuerKunde);
-      } else {
-        if (_standortNameController.text.trim().isEmpty) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Bitte einen Namen für den ersten Standort angeben!')),
-          );
-          return;
-        }
-
-        final neuerStandort = Standort(
-          kundeId: '',
-          name: _standortNameController.text.trim(),
-          strasse: _strasseController.text.trim(),
-          plz: _plzController.text.trim(),
-          ort: _ortController.text.trim(),
-        );
-
-        await widget.onAdd(neuerKunde, neuerStandort);
+      if (_standortNameController.text.trim().isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Bitte einen Namen für den ersten Standort angeben!')));
+        return;
       }
 
+      final neuerStandort = Standort(
+        kundeId: '',
+        name: _standortNameController.text.trim(),
+        strasse: _standortStrasseController.text.trim(),
+        plz: _standortPlzController.text.trim(),
+        ort: _standortOrtController.text.trim(),
+      );
+
+      await widget.onAdd(neuerKunde, neuerStandort);
       Navigator.of(context).pop();
     }
   }
@@ -351,7 +352,7 @@ class _KundenDialogState extends State<KundenDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: Text(isEdit ? 'Kunde bearbeiten' : 'Neuen Kunden anlegen'),
+      title: const Text('Neuen Kunden anlegen'),
       content: Form(
         key: _formKey,
         child: SingleChildScrollView(
@@ -359,64 +360,32 @@ class _KundenDialogState extends State<KundenDialog> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              TextFormField(
-                controller: _nummerController,
-                decoration: const InputDecoration(labelText: 'Kundennummer*'),
-                validator: (v) => v == null || v.isEmpty ? 'Pflichtfeld' : null,
-              ),
-              TextFormField(
-                controller: _nameController,
-                decoration: const InputDecoration(labelText: 'Name*'),
-                validator: (v) => v == null || v.isEmpty ? 'Pflichtfeld' : null,
-              ),
-              TextFormField(
-                controller: _ansprechpartnerController,
-                decoration: const InputDecoration(labelText: 'Ansprechpartner'),
-              ),
-              TextFormField(
-                controller: _telefonController,
-                decoration: const InputDecoration(labelText: 'Telefon'),
-              ),
-              TextFormField(
-                controller: _emailController,
-                decoration: const InputDecoration(labelText: 'E-Mail'),
-                keyboardType: TextInputType.emailAddress,
-              ),
-              if (!isEdit) ...[
-                const Divider(height: 32),
-                Text("Erster Standort", style: Theme.of(context).textTheme.titleMedium),
-                const SizedBox(height: 8),
-                TextFormField(
-                  controller: _standortNameController,
-                  decoration: const InputDecoration(labelText: 'Standort-Name*'),
-                  validator: (v) => v == null || v.isEmpty ? 'Pflichtfeld' : null,
-                ),
-                TextFormField(
-                  controller: _strasseController,
-                  decoration: const InputDecoration(labelText: 'Straße'),
-                ),
-                TextFormField(
-                  controller: _plzController,
-                  decoration: const InputDecoration(labelText: 'PLZ'),
-                ),
-                TextFormField(
-                  controller: _ortController,
-                  decoration: const InputDecoration(labelText: 'Ort'),
-                ),
-              ]
+              Text("Kundendaten", style: Theme.of(context).textTheme.titleMedium),
+              TextFormField(controller: _nummerController, decoration: const InputDecoration(labelText: 'Kundennummer*'), validator: (v) => v!.isEmpty ? 'Pflichtfeld' : null),
+              TextFormField(controller: _nameController, decoration: const InputDecoration(labelText: 'Name*'), validator: (v) => v!.isEmpty ? 'Pflichtfeld' : null),
+              TextFormField(controller: _ansprechpartnerController, decoration: const InputDecoration(labelText: 'Ansprechpartner')),
+              TextFormField(controller: _telefonController, decoration: const InputDecoration(labelText: 'Telefon')),
+              TextFormField(controller: _emailController, decoration: const InputDecoration(labelText: 'E-Mail'), keyboardType: TextInputType.emailAddress),
+              // --- NEUE FORMULARFELDER ---
+              TextFormField(controller: _kundeStrasseController, decoration: const InputDecoration(labelText: 'Straße (Hauptsitz)')),
+              TextFormField(controller: _kundePlzController, decoration: const InputDecoration(labelText: 'PLZ (Hauptsitz)')),
+              TextFormField(controller: _kundeOrtController, decoration: const InputDecoration(labelText: 'Ort (Hauptsitz)')),
+              const SizedBox(height: 8),
+              TextFormField(controller: _kundeBemerkungController, decoration: const InputDecoration(labelText: 'Bemerkung', border: OutlineInputBorder()), minLines: 2, maxLines: 3),
+              const Divider(height: 32),
+              Text("Erster Standort", style: Theme.of(context).textTheme.titleMedium),
+              const SizedBox(height: 8),
+              TextFormField(controller: _standortNameController, decoration: const InputDecoration(labelText: 'Standort-Name*'), validator: (v) => v!.isEmpty ? 'Pflichtfeld' : null),
+              TextFormField(controller: _standortStrasseController, decoration: const InputDecoration(labelText: 'Straße')),
+              TextFormField(controller: _standortPlzController, decoration: const InputDecoration(labelText: 'PLZ')),
+              TextFormField(controller: _standortOrtController, decoration: const InputDecoration(labelText: 'Ort')),
             ],
           ),
         ),
       ),
       actions: [
-        TextButton(
-          child: const Text('Abbrechen'),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-        ElevatedButton(
-          child: Text(isEdit ? 'Speichern' : 'Hinzufügen'),
-          onPressed: _submit,
-        ),
+        TextButton(child: const Text('Abbrechen'), onPressed: () => Navigator.of(context).pop()),
+        ElevatedButton(child: const Text('Hinzufügen'), onPressed: _submit),
       ],
     );
   }

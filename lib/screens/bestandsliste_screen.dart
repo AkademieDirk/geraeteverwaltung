@@ -241,18 +241,13 @@ class _BestandslisteScreenState extends State<BestandslisteScreen> {
       gruppierteGeraete.putIfAbsent(geraet.modell, () => []).add(geraet);
     }
 
-    // --- ANFANG DER SORTIERFUNKTION ---
-    // Jede Liste innerhalb der Gruppe wird nach dem Zählerstand sortiert.
     gruppierteGeraete.forEach((modell, geraeteListe) {
       geraeteListe.sort((a, b) {
-        // Zählerstände werden in Zahlen umgewandelt, um korrekt zu vergleichen.
-        // Geräte ohne Angabe (oder mit ungültiger) werden ans Ende sortiert.
         final zaehlerA = int.tryParse(a.zaehlerGesamt) ?? 9999999;
         final zaehlerB = int.tryParse(b.zaehlerGesamt) ?? 9999999;
         return zaehlerA.compareTo(zaehlerB);
       });
     });
-    // --- ENDE DER SORTIERFUNKTION ---
 
     final sortierteModelle = gruppierteGeraete.keys.toList()..sort();
 
@@ -313,6 +308,15 @@ class _BestandslisteScreenState extends State<BestandslisteScreen> {
               ],
             ),
           ),
+          // --- ANFANG DER ÄNDERUNG ---
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+            child: Text(
+              'Gefundene Geräte: ${gefilterteListe.length}',
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black54),
+            ),
+          ),
+          // --- ENDE DER ÄNDERUNG ---
           Expanded(
             child: gruppierteGeraete.isEmpty
                 ? const Center(child: Text('Keine Geräte für die Auswahl gefunden.'))
@@ -343,12 +347,12 @@ class _BestandslisteScreenState extends State<BestandslisteScreen> {
                         title: Row(
                           children: [
                             Text('SN: ${g.seriennummer}'),
-                            const SizedBox(width: 24), // Fester Abstand
+                            const SizedBox(width: 24),
                             Text(
                               'Zähler: ${g.zaehlerGesamt.isNotEmpty ? g.zaehlerGesamt : 'k.A.'}',
                               style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                             ),
-                            const SizedBox(width: 24), // Fester Abstand
+                            const SizedBox(width: 24),
                             Text(
                               g.originaleinzugTyp.isNotEmpty ? g.originaleinzugTyp : 'k.A.',
                               style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.blueAccent),

@@ -13,14 +13,14 @@ class GeraeteAufnahmeScreen extends StatefulWidget {
   final Geraet? initialGeraet;
   final Future<void> Function(Geraet) onSave;
   final Future<void> Function(List<Geraet>) onImport;
-  final List<Geraet> alleGeraete; // <-- HINZUGEFÜGT
+  final List<Geraet> alleGeraete;
 
   const GeraeteAufnahmeScreen({
     Key? key,
     this.initialGeraet,
     required this.onSave,
     required this.onImport,
-    required this.alleGeraete, // <-- HINZUGEFÜGT
+    required this.alleGeraete,
   }) : super(key: key);
 
   @override
@@ -38,8 +38,8 @@ class _GeraeteAufnahmeScreenState extends State<GeraeteAufnahmeScreen> {
   final List<String> _mitarbeiterOptionen = ['Nichts ausgewählt', 'Patrick Heidrich', 'Carsten Sobota', 'Melanie Toffel', 'Dirk Kraft'];
   final List<String> _jaNeinOptionen = ['Nichts ausgewählt', 'Ja', 'Nein'];
   final List<String> _pdfTypen = ['Nichts ausgewählt', 'A / B'];
-  final List<String> _originaleinzugTypOptionen = ['Nichts ausgewählt', 'Kein', 'DF-714', 'DF-715', 'DF-632', 'DF-633', 'Sonstiges'];
-  final List<String> _unterschrankTypOptionen = ['Nichts ausgewählt', 'Kein', 'PC-116', 'PC-216', 'PC-416', 'Sonstiges'];
+  final List<String> _originaleinzugTypOptionen = ['Nichts ausgewählt', 'Kein', 'DF-714', 'DF-715', 'DF-632', 'DF-633',  'DF-624','DF-628','Sonstiges'];
+  final List<String> _unterschrankTypOptionen = ['Nichts ausgewählt', 'Kein', 'PC-116', 'PC-216', 'PC-416', 'PC-210', 'Sonstiges'];
   final List<String> _finisherOptionen = ['Nichts ausgewählt', 'Kein', 'FS-533', 'FS-539', 'FS-532', 'Sonstiges'];
 
   // Controller und Felder
@@ -167,13 +167,11 @@ class _GeraeteAufnahmeScreenState extends State<GeraeteAufnahmeScreen> {
   }
 
   void _saveGeraet() async {
-    // --- ANFANG DER PRÜFLOGIK ---
     final neueNummer = _nummerController.text.trim();
 
-    // Prüfen, ob ein ANDERES Gerät diese Nummer bereits verwendet.
     final istDuplikat = widget.alleGeraete.any((geraet) =>
-    geraet.nummer == neueNummer && // Nummer ist identisch UND...
-        geraet.id != widget.initialGeraet?.id // ...es ist nicht das Gerät, das wir gerade bearbeiten.
+    geraet.nummer == neueNummer &&
+        geraet.id != widget.initialGeraet?.id
     );
 
     if (istDuplikat) {
@@ -183,9 +181,8 @@ class _GeraeteAufnahmeScreenState extends State<GeraeteAufnahmeScreen> {
           backgroundColor: Colors.red,
         ),
       );
-      return; // Die Funktion hier abbrechen
+      return;
     }
-    // --- ENDE DER PRÜFLOGIK ---
 
     if (neueNummer.isEmpty || _selectedModell == 'Nichts ausgewählt') {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Bitte Gerätenummer und Modell angeben!')));
@@ -345,13 +342,41 @@ class _GeraeteAufnahmeScreenState extends State<GeraeteAufnahmeScreen> {
               const SizedBox(height: 22),
               const Text('Füllstände (in %):', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
               const SizedBox(height: 8),
-              Row(children: [ProzentDropdown(label: 'RTB', value: _rtb, onChanged: (val) => setState(() => _rtb = val ?? 0)), const SizedBox(width: 8), ProzentDropdown(label: 'Toner K', value: _tonerK, onChanged: (val) => setState(() => _tonerK = val ?? 0)), const SizedBox(width: 8), ProzentDropdown(label: 'Toner C', value: _tonerC, onChanged: (val) => setState(() => _tonerC = val ?? 0)), const SizedBox(width: 8), ProzentDropdown(label: 'Toner M', value: _tonerM, onChanged: (val) => setState(() => _tonerM = val ?? 0)), const SizedBox(width: 8), ProzentDropdown(label: 'Toner Y', value: _tonerY, onChanged: (val) => setState(() => _tonerY = val ?? 0))]),
+              // --- ANFANG DER ÄNDERUNG ---
+              Row(children: [
+                ProzentDropdown(label: 'RTB', value: _rtb, onChanged: (val) => setState(() => _rtb = val ?? 0)),
+                const SizedBox(width: 8),
+                ProzentDropdown(label: 'Toner K', value: _tonerK, onChanged: (val) => setState(() => _tonerK = val ?? 0)),
+                const SizedBox(width: 8),
+                ProzentDropdown(label: 'Toner Y', value: _tonerY, onChanged: (val) => setState(() => _tonerY = val ?? 0)),
+                const SizedBox(width: 8),
+                ProzentDropdown(label: 'Toner M', value: _tonerM, onChanged: (val) => setState(() => _tonerM = val ?? 0)),
+                const SizedBox(width: 8),
+                ProzentDropdown(label: 'Toner C', value: _tonerC, onChanged: (val) => setState(() => _tonerC = val ?? 0)),
+              ]),
+              // --- ENDE DER ÄNDERUNG ---
               const SizedBox(height: 22),
               const Text('Laufzeiten Bildeinheit (jeweils %):', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-              Row(children: [ProzentDropdown(label: 'K', value: _laufzeitBildeinheitK, onChanged: (val) => setState(() => _laufzeitBildeinheitK = val ?? 0)), const SizedBox(width: 8), ProzentDropdown(label: 'C', value: _laufzeitBildeinheitC, onChanged: (val) => setState(() => _laufzeitBildeinheitC = val ?? 0)), const SizedBox(width: 8), ProzentDropdown(label: 'M', value: _laufzeitBildeinheitM, onChanged: (val) => setState(() => _laufzeitBildeinheitM = val ?? 0)), const SizedBox(width: 8), ProzentDropdown(label: 'Y', value: _laufzeitBildeinheitY, onChanged: (val) => setState(() => _laufzeitBildeinheitY = val ?? 0))]),
+              Row(children: [
+                ProzentDropdown(label: 'K', value: _laufzeitBildeinheitK, onChanged: (val) => setState(() => _laufzeitBildeinheitK = val ?? 0)),
+                const SizedBox(width: 8),
+                ProzentDropdown(label: 'Y', value: _laufzeitBildeinheitY, onChanged: (val) => setState(() => _laufzeitBildeinheitY = val ?? 0)),
+                const SizedBox(width: 8),
+                ProzentDropdown(label: 'M', value: _laufzeitBildeinheitM, onChanged: (val) => setState(() => _laufzeitBildeinheitM = val ?? 0)),
+                const SizedBox(width: 8),
+                ProzentDropdown(label: 'C', value: _laufzeitBildeinheitC, onChanged: (val) => setState(() => _laufzeitBildeinheitC = val ?? 0)),
+              ]),
               const SizedBox(height: 22),
               const Text('Laufzeiten Entwickler (jeweils %):', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-              Row(children: [ProzentDropdown(label: 'K', value: _laufzeitEntwicklerK, onChanged: (val) => setState(() => _laufzeitEntwicklerK = val ?? 0)), const SizedBox(width: 8), ProzentDropdown(label: 'C', value: _laufzeitEntwicklerC, onChanged: (val) => setState(() => _laufzeitEntwicklerC = val ?? 0)), const SizedBox(width: 8), ProzentDropdown(label: 'M', value: _laufzeitEntwicklerM, onChanged: (val) => setState(() => _laufzeitEntwicklerM = val ?? 0)), const SizedBox(width: 8), ProzentDropdown(label: 'Y', value: _laufzeitEntwicklerY, onChanged: (val) => setState(() => _laufzeitEntwicklerY = val ?? 0))]),
+              Row(children: [
+                ProzentDropdown(label: 'K', value: _laufzeitEntwicklerK, onChanged: (val) => setState(() => _laufzeitEntwicklerK = val ?? 0)),
+                const SizedBox(width: 8),
+                ProzentDropdown(label: 'Y', value: _laufzeitEntwicklerY, onChanged: (val) => setState(() => _laufzeitEntwicklerY = val ?? 0)),
+                const SizedBox(width: 8),
+                ProzentDropdown(label: 'M', value: _laufzeitEntwicklerM, onChanged: (val) => setState(() => _laufzeitEntwicklerM = val ?? 0)),
+                const SizedBox(width: 8),
+                ProzentDropdown(label: 'C', value: _laufzeitEntwicklerC, onChanged: (val) => setState(() => _laufzeitEntwicklerC = val ?? 0)),
+              ]),
               const SizedBox(height: 22),
               Row(children: [ProzentDropdown(label: 'Fixiereinheit', value: _laufzeitFixiereinheit, onChanged: (val) => setState(() => _laufzeitFixiereinheit = val ?? 0)), const SizedBox(width: 8), ProzentDropdown(label: 'Transferbelt', value: _laufzeitTransferbelt, onChanged: (val) => setState(() => _laufzeitTransferbelt = val ?? 0))]),
               const SizedBox(height: 22),
