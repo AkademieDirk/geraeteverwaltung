@@ -4,12 +4,13 @@ import 'package:excel/excel.dart';
 import '../models/geraet.dart';
 import '../models/kunde.dart';
 import '../models/standort.dart';
-import 'geraeteaufnahme/geraeteaufnahme_screen.dart';
+
+import '../widgets/bestandsliste_gruppe.dart'; // <-- NEUER IMPORT
 
 class BestandslisteScreen extends StatefulWidget {
   final List<Geraet> alleGeraete;
   final Future<void> Function(Geraet) onUpdate;
-  final Future<void> Function(String) onDelete; // Nimmt die ID des Geräts entgegen
+  final Future<void> Function(String) onDelete;
   final List<Kunde> kunden;
   final List<Standort> standorte;
   final Future<void> Function(Geraet, Kunde, Standort) onAssign;
@@ -214,7 +215,6 @@ class _BestandslisteScreenState extends State<BestandslisteScreen> {
     );
   }
 
-
   @override
   Widget build(BuildContext context) {
     List<Geraet> gefilterteListe = widget.alleGeraete.where((g) => g.status == 'Im Lager').toList();
@@ -232,7 +232,13 @@ class _BestandslisteScreenState extends State<BestandslisteScreen> {
       gefilterteListe = gefilterteListe.where((g) =>
       g.nummer.toLowerCase().contains(begriff) ||
           g.modell.toLowerCase().contains(begriff) ||
-          g.seriennummer.toLowerCase().contains(begriff)
+          g.seriennummer.toLowerCase().contains(begriff) ||
+          g.lieferant.toLowerCase().contains(begriff) ||
+          g.mitarbeiter.toLowerCase().contains(begriff) ||
+          g.bemerkung.toLowerCase().contains(begriff) ||
+          g.originaleinzugSN.toLowerCase().contains(begriff) ||
+          g.unterschrankSN.toLowerCase().contains(begriff) ||
+          g.finisherSN.toLowerCase().contains(begriff)
       ).toList();
     }
 
@@ -277,7 +283,7 @@ class _BestandslisteScreenState extends State<BestandslisteScreen> {
                   flex: 3,
                   child: TextField(
                     controller: _suchController,
-                    decoration: InputDecoration(labelText: 'Bestand durchsuchen...', prefixIcon: const Icon(Icons.search), suffixIcon: _suchbegriff.isNotEmpty ? IconButton(icon: const Icon(Icons.clear), onPressed: () { setState(() { _suchController.clear(); _suchbegriff = ''; }); }) : null, border: const OutlineInputBorder()),
+                    decoration: InputDecoration(labelText: 'Volltextsuche im Bestand...', prefixIcon: const Icon(Icons.search), suffixIcon: _suchbegriff.isNotEmpty ? IconButton(icon: const Icon(Icons.clear), onPressed: () { setState(() { _suchController.clear(); _suchbegriff = ''; }); }) : null, border: const OutlineInputBorder()),
                     onChanged: (wert) => setState(() => _suchbegriff = wert.trim()),
                   ),
                 ),
@@ -308,7 +314,6 @@ class _BestandslisteScreenState extends State<BestandslisteScreen> {
               ],
             ),
           ),
-          // --- ANFANG DER ÄNDERUNG ---
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
             child: Text(
@@ -316,77 +321,33 @@ class _BestandslisteScreenState extends State<BestandslisteScreen> {
               style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black54),
             ),
           ),
-          // --- ENDE DER ÄNDERUNG ---
           Expanded(
             child: gruppierteGeraete.isEmpty
                 ? const Center(child: Text('Keine Geräte für die Auswahl gefunden.'))
                 : ListView.separated(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
               itemCount: sortierteModelle.length,
               separatorBuilder: (context, index) => const Divider(
                 color: Colors.green,
                 thickness: 1,
               ),
+              // --- ANFANG DER ÄNDERUNG ---
               itemBuilder: (ctx, index) {
                 final modell = sortierteModelle[index];
                 final geraeteInGruppe = gruppierteGeraete[modell]!;
 
-                return Card(
-                  margin: const EdgeInsets.symmetric(vertical: 8),
-                  child: ExpansionTile(
-                    initiallyExpanded: true,
-                    title: Text(
-                      '$modell (${geraeteInGruppe.length} Stk.)',
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-                    ),
-                    children: geraeteInGruppe.map((g) {
-                      return ListTile(
-                        leading: CircleAvatar(
-                          child: Text(g.nummer, textAlign: TextAlign.center),
-                        ),
-                        title: Row(
-                          children: [
-                            Text('SN: ${g.seriennummer}'),
-                            const SizedBox(width: 24),
-                            Text(
-                              'Zähler: ${g.zaehlerGesamt.isNotEmpty ? g.zaehlerGesamt : 'k.A.'}',
-                              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                            ),
-                            const SizedBox(width: 24),
-                            Text(
-                              g.originaleinzugTyp.isNotEmpty ? g.originaleinzugTyp : 'k.A.',
-                              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.blueAccent),
-                            ),
-                          ],
-                        ),
-                        trailing: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            IconButton(icon: const Icon(Icons.local_shipping, color: Colors.blueAccent), tooltip: 'Ausliefern', onPressed: () => _showZuordnungsDialog(g)),
-                            IconButton(
-                              icon: const Icon(Icons.edit, color: Colors.orange),
-                              tooltip: 'Bearbeiten',
-                              onPressed: () => Navigator.push(context, MaterialPageRoute(
-                                builder: (_) => GeraeteAufnahmeScreen(
-                                  initialGeraet: g,
-                                  onSave: widget.onUpdate,
-                                  onImport: widget.onImport,
-                                  alleGeraete: widget.alleGeraete,
-                                ),
-                              )),
-                            ),
-                            IconButton(
-                              icon: const Icon(Icons.delete, color: Colors.redAccent),
-                              tooltip: 'Löschen',
-                              onPressed: () => _showDeleteConfirmationDialog(g),
-                            ),
-                          ],
-                        ),
-                      );
-                    }).toList(),
-                  ),
+                // Hier wird der unübersichtliche Code durch das neue Widget ersetzt
+                return BestandslisteGruppe(
+                  modell: modell,
+                  geraeteInGruppe: geraeteInGruppe,
+                  alleGeraete: widget.alleGeraete,
+                  onUpdate: widget.onUpdate,
+                  onImport: widget.onImport,
+                  onShowZuordnungsDialog: _showZuordnungsDialog,
+                  onShowDeleteDialog: _showDeleteConfirmationDialog,
                 );
               },
+              // --- ENDE DER ÄNDERUNG ---
             ),
           ),
         ],

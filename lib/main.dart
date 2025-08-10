@@ -11,10 +11,11 @@ import 'models/ersatzteil.dart';
 import 'models/verbautes_teil.dart';
 import 'models/kunde.dart';
 import 'models/standort.dart';
+import 'models/serviceeintrag.dart';
 
 class FirestoreService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
-  final Uuid _uuid = Uuid();
+  final Uuid _uuid = const Uuid();
 
   // --- Geräte-Operationen ---
   Stream<List<Geraet>> getGeraete() => _db.collection('geraete').snapshots().map((snapshot) => snapshot.docs.map((doc) => Geraet.fromFirestore(doc)).toList());
@@ -29,6 +30,28 @@ class FirestoreService {
     }
     return batch.commit();
   }
+  Future<void> addGeraetForKunde(Geraet geraet, Kunde kunde, Standort standort) {
+    final geraetMitKunde = geraet.copyWith(
+      status: 'Verkauft',
+      kundeId: kunde.id,
+      kundeName: kunde.name,
+      standortId: standort.id,
+      standortName: standort.name,
+      nummer: '',
+    );
+    return _db.collection('geraete').add(geraetMitKunde.toJson());
+  }
+  Future<void> addGeraetForKundeOhneStandort(Geraet geraet, Kunde kunde) {
+    final geraetMitKunde = geraet.copyWith(
+      status: 'Verkauft',
+      kundeId: kunde.id,
+      kundeName: kunde.name,
+      standortId: null,
+      standortName: 'N/A',
+      nummer: '',
+    );
+    return _db.collection('geraete').add(geraetMitKunde.toJson());
+  }
 
   // --- Ersatzteil-Operationen ---
   Stream<List<Ersatzteil>> getErsatzteile() => _db.collection('ersatzteile').snapshots().map((snapshot) => snapshot.docs.map((doc) => Ersatzteil.fromFirestore(doc)).toList());
@@ -36,7 +59,7 @@ class FirestoreService {
   Future<void> updateErsatzteil(Ersatzteil ersatzteil) => _db.collection('ersatzteile').doc(ersatzteil.id).update(ersatzteil.toJson());
   Future<void> deleteErsatzteil(String ersatzteilId) => _db.collection('ersatzteile').doc(ersatzteilId).delete();
 
-  // --- Historien-Operationen ---
+  // --- Historien-Operationen (für verbaute Teile) ---
   Stream<Map<String, List<VerbautesTeil>>> getVerbauteTeile() {
     return _db.collection('historie').snapshots().map((snapshot) {
       Map<String, List<VerbautesTeil>> historie = {};
@@ -49,20 +72,36 @@ class FirestoreService {
       return historie;
     });
   }
+
+  // --- ANFANG DER KORREKTUR ---
+  // Die Funktion nimmt jetzt wieder ein einfaches Ersatzteil entgegen.
   Future<void> addVerbautesTeil(String seriennummer, Ersatzteil teil, String lager) async {
     final ersatzteilRef = _db.collection('ersatzteile').doc(teil.id);
     final historieRef = _db.collection('historie').doc(seriennummer);
+
+    // Das 'VerbautesTeil'-Objekt wird hier sicher erstellt.
+    final verbautesTeil = VerbautesTeil(
+      id: _uuid.v4(),
+      ersatzteil: teil,
+      installationsDatum: DateTime.now(),
+      tatsaechlicherPreis: teil.preis,
+      herkunftslager: lager,
+    );
+
     return _db.runTransaction((transaction) async {
       final ersatzteilSnapshot = await transaction.get(ersatzteilRef);
       if (!ersatzteilSnapshot.exists) throw Exception("Ersatzteil nicht gefunden!");
+
       final ersatzteilDaten = Ersatzteil.fromFirestore(ersatzteilSnapshot);
       int aktuellerBestand = ersatzteilDaten.lagerbestaende[lager] ?? 0;
       if (aktuellerBestand <= 0) throw Exception("Kein Bestand in Lager '$lager'.");
+
       transaction.update(ersatzteilRef, {'lagerbestaende.$lager': FieldValue.increment(-1)});
-      final verbautesTeil = VerbautesTeil(id: _uuid.v4(), ersatzteil: teil, installationsDatum: DateTime.now(), tatsaechlicherPreis: teil.preis, herkunftslager: lager);
       transaction.set(historieRef, {'teile': FieldValue.arrayUnion([verbautesTeil.toJson()])}, SetOptions(merge: true));
     });
   }
+  // --- ENDE DER KORREKTUR ---
+
   Future<void> updateVerbautesTeil(String seriennummer, VerbautesTeil geandertesTeil) async {
     final docRef = _db.collection('historie').doc(seriennummer);
     final doc = await docRef.get();
@@ -116,6 +155,13 @@ class FirestoreService {
     return ersatzteilRef.update({'lagerbestaende.$lager': FieldValue.increment(anzahl)});
   }
 
+  // --- Service-Operationen ---
+  Stream<List<Serviceeintrag>> getServiceeintraege() => _db.collection('servicehistorie').snapshots().map((snapshot) => snapshot.docs.map((doc) => Serviceeintrag.fromFirestore(doc)).toList());
+  Future<void> addServiceeintrag(Serviceeintrag eintrag) => _db.collection('servicehistorie').add(eintrag.toJson());
+  Future<void> updateServiceeintrag(Serviceeintrag eintrag) => _db.collection('servicehistorie').doc(eintrag.id).update(eintrag.toJson());
+  Future<void> deleteServiceeintrag(String eintragId) => _db.collection('servicehistorie').doc(eintragId).delete();
+
+
   // --- Kunden-Operationen ---
   Stream<List<Kunde>> getKunden() => _db.collection('kunden').snapshots().map((snapshot) => snapshot.docs.map((doc) => Kunde.fromFirestore(doc)).toList());
   Future<void> updateKunde(Kunde kunde) => _db.collection('kunden').doc(kunde.id).update(kunde.toJson());
@@ -154,24 +200,28 @@ class FirestoreService {
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-  runApp(MyApp());
+  runApp(const MyApp());
 }
 
 class MyApp extends StatelessWidget {
+  const MyApp({super.key});
+
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(title: 'Gerätemanager', theme: ThemeData(primarySwatch: Colors.blue), home: AuthGate());
+    return MaterialApp(title: 'Gerätemanager', theme: ThemeData(primarySwatch: Colors.blue), home: const AuthGate());
   }
 }
 
 class AuthGate extends StatelessWidget {
+  const AuthGate({super.key});
+
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<User?>(
       stream: FirebaseAuth.instance.authStateChanges(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) return const Scaffold(body: Center(child: CircularProgressIndicator()));
-        if (snapshot.hasData) return MyHomePage();
+        if (snapshot.hasData) return const MyHomePage();
         return const LoginScreen();
       },
     );
@@ -179,6 +229,8 @@ class AuthGate extends StatelessWidget {
 }
 
 class MyHomePage extends StatefulWidget {
+  const MyHomePage({super.key});
+
   @override
   _MyHomePageState createState() => _MyHomePageState();
 }
@@ -187,67 +239,83 @@ class _MyHomePageState extends State<MyHomePage> {
   final FirestoreService _firestoreService = FirestoreService();
   @override
   Widget build(BuildContext context) {
-    return StreamBuilder<List<Geraet>>(
-      stream: _firestoreService.getGeraete(),
-      builder: (context, geraeteSnapshot) {
-        if (geraeteSnapshot.connectionState == ConnectionState.waiting) return const Scaffold(body: Center(child: CircularProgressIndicator()));
-        if (geraeteSnapshot.hasError) return Scaffold(body: Center(child: Text('Fehler beim Laden der Geräte: ${geraeteSnapshot.error}')));
-        final geraete = geraeteSnapshot.data ?? [];
-        return StreamBuilder<List<Ersatzteil>>(
-          stream: _firestoreService.getErsatzteile(),
-          builder: (context, ersatzteileSnapshot) {
-            if (ersatzteileSnapshot.connectionState == ConnectionState.waiting) return const Scaffold(body: Center(child: CircularProgressIndicator()));
-            if (ersatzteileSnapshot.hasError) return Scaffold(body: Center(child: Text('Fehler beim Laden der Ersatzteile: ${ersatzteileSnapshot.error}')));
-            final ersatzteile = ersatzteileSnapshot.data ?? [];
-            return StreamBuilder<Map<String, List<VerbautesTeil>>>(
-              stream: _firestoreService.getVerbauteTeile(),
-              builder: (context, historieSnapshot) {
-                if (historieSnapshot.connectionState == ConnectionState.waiting) return const Scaffold(body: Center(child: CircularProgressIndicator()));
-                if (historieSnapshot.hasError) return Scaffold(body: Center(child: Text('Fehler beim Laden der Historie: ${historieSnapshot.error}')));
-                final verbauteTeile = historieSnapshot.data ?? {};
-                return StreamBuilder<List<Kunde>>(
-                    stream: _firestoreService.getKunden(),
-                    builder: (context, kundenSnapshot) {
-                      if (kundenSnapshot.connectionState == ConnectionState.waiting) return const Scaffold(body: Center(child: CircularProgressIndicator()));
-                      if (kundenSnapshot.hasError) return Scaffold(body: Center(child: Text('Fehler beim Laden der Kunden: ${kundenSnapshot.error}')));
-                      final kunden = kundenSnapshot.data ?? [];
-                      return StreamBuilder<List<Standort>>(
-                          stream: _firestoreService.getStandorte(),
-                          builder: (context, standorteSnapshot) {
-                            if (standorteSnapshot.connectionState == ConnectionState.waiting) return const Scaffold(body: Center(child: CircularProgressIndicator()));
-                            if (standorteSnapshot.hasError) return Scaffold(body: Center(child: Text('Fehler beim Laden der Standorte: ${standorteSnapshot.error}')));
-                            final standorte = standorteSnapshot.data ?? [];
+    return StreamBuilder<List<Serviceeintrag>>(
+      stream: _firestoreService.getServiceeintraege(),
+      builder: (context, serviceSnapshot) {
+        if (serviceSnapshot.connectionState == ConnectionState.waiting) return const Scaffold(body: Center(child: CircularProgressIndicator()));
+        if (serviceSnapshot.hasError) return Scaffold(body: Center(child: Text('Fehler: ${serviceSnapshot.error}')));
+        final serviceeintraege = serviceSnapshot.data ?? [];
 
-                            return AuswahlScreen(
-                              geraete: geraete,
-                              ersatzteile: ersatzteile,
-                              verbauteTeile: verbauteTeile,
-                              kunden: kunden,
-                              standorte: standorte,
-                              onAddGeraet: _firestoreService.addGeraet,
-                              onUpdateGeraet: _firestoreService.updateGeraet,
-                              onDeleteGeraet: _firestoreService.deleteGeraet,
-                              onImportGeraete: _firestoreService.importGeraete,
-                              onAddErsatzteil: _firestoreService.addErsatzteil,
-                              onUpdateErsatzteil: _firestoreService.updateErsatzteil,
-                              onDeleteErsatzteil: _firestoreService.deleteErsatzteil,
-                              onTeilVerbauen: _firestoreService.addVerbautesTeil,
-                              onDeleteVerbautesTeil: _firestoreService.deleteVerbautesTeil,
-                              onUpdateVerbautesTeil: _firestoreService.updateVerbautesTeil,
-                              onTransfer: _firestoreService.transferErsatzteil,
-                              onBookIn: _firestoreService.bookInErsatzteil,
-                              onAddKunde: _firestoreService.addKundeAndStandort,
-                              onUpdateKunde: _firestoreService.updateKunde,
-                              onDeleteKunde: _firestoreService.deleteKunde,
-                              onImportKunden: _firestoreService.importKunden,
-                              onAddStandort: _firestoreService.addStandort,
-                              onUpdateStandort: _firestoreService.updateStandort,
-                              onDeleteStandort: _firestoreService.deleteStandort,
-                              onAssignGeraet: _firestoreService.assignGeraetToKunde,
-                            );
-                          }
-                      );
-                    }
+        return StreamBuilder<List<Geraet>>(
+          stream: _firestoreService.getGeraete(),
+          builder: (context, geraeteSnapshot) {
+            if (geraeteSnapshot.connectionState == ConnectionState.waiting) return const Scaffold(body: Center(child: CircularProgressIndicator()));
+            if (geraeteSnapshot.hasError) return Scaffold(body: Center(child: Text('Fehler beim Laden der Geräte: ${geraeteSnapshot.error}')));
+            final geraete = geraeteSnapshot.data ?? [];
+            return StreamBuilder<List<Ersatzteil>>(
+              stream: _firestoreService.getErsatzteile(),
+              builder: (context, ersatzteileSnapshot) {
+                if (ersatzteileSnapshot.connectionState == ConnectionState.waiting) return const Scaffold(body: Center(child: CircularProgressIndicator()));
+                if (ersatzteileSnapshot.hasError) return Scaffold(body: Center(child: Text('Fehler beim Laden der Ersatzteile: ${ersatzteileSnapshot.error}')));
+                final ersatzteile = ersatzteileSnapshot.data ?? [];
+                return StreamBuilder<Map<String, List<VerbautesTeil>>>(
+                  stream: _firestoreService.getVerbauteTeile(),
+                  builder: (context, historieSnapshot) {
+                    if (historieSnapshot.connectionState == ConnectionState.waiting) return const Scaffold(body: Center(child: CircularProgressIndicator()));
+                    if (historieSnapshot.hasError) return Scaffold(body: Center(child: Text('Fehler beim Laden der Historie: ${historieSnapshot.error}')));
+                    final verbauteTeile = historieSnapshot.data ?? {};
+                    return StreamBuilder<List<Kunde>>(
+                        stream: _firestoreService.getKunden(),
+                        builder: (context, kundenSnapshot) {
+                          if (kundenSnapshot.connectionState == ConnectionState.waiting) return const Scaffold(body: Center(child: CircularProgressIndicator()));
+                          if (kundenSnapshot.hasError) return Scaffold(body: Center(child: Text('Fehler beim Laden der Kunden: ${kundenSnapshot.error}')));
+                          final kunden = kundenSnapshot.data ?? [];
+                          return StreamBuilder<List<Standort>>(
+                              stream: _firestoreService.getStandorte(),
+                              builder: (context, standorteSnapshot) {
+                                if (standorteSnapshot.connectionState == ConnectionState.waiting) return const Scaffold(body: Center(child: CircularProgressIndicator()));
+                                if (standorteSnapshot.hasError) return Scaffold(body: Center(child: Text('Fehler beim Laden der Standorte: ${standorteSnapshot.error}')));
+                                final standorte = standorteSnapshot.data ?? [];
+
+                                return AuswahlScreen(
+                                  serviceeintraege: serviceeintraege,
+                                  onAddServiceeintrag: _firestoreService.addServiceeintrag,
+                                  onUpdateServiceeintrag: _firestoreService.updateServiceeintrag,
+                                  onDeleteServiceeintrag: _firestoreService.deleteServiceeintrag,
+                                  geraete: geraete,
+                                  ersatzteile: ersatzteile,
+                                  verbauteTeile: verbauteTeile,
+                                  kunden: kunden,
+                                  standorte: standorte,
+                                  onAddGeraet: _firestoreService.addGeraet,
+                                  onUpdateGeraet: _firestoreService.updateGeraet,
+                                  onDeleteGeraet: _firestoreService.deleteGeraet,
+                                  onImportGeraete: _firestoreService.importGeraete,
+                                  onAddErsatzteil: _firestoreService.addErsatzteil,
+                                  onUpdateErsatzteil: _firestoreService.updateErsatzteil,
+                                  onDeleteErsatzteil: _firestoreService.deleteErsatzteil,
+                                  // --- KORRIGIERTER AUFRUF ---
+                                  onTeilVerbauen: _firestoreService.addVerbautesTeil,
+                                  onDeleteVerbautesTeil: _firestoreService.deleteVerbautesTeil,
+                                  onUpdateVerbautesTeil: _firestoreService.updateVerbautesTeil,
+                                  onTransfer: _firestoreService.transferErsatzteil,
+                                  onBookIn: _firestoreService.bookInErsatzteil,
+                                  onAddKunde: _firestoreService.addKundeAndStandort,
+                                  onUpdateKunde: _firestoreService.updateKunde,
+                                  onDeleteKunde: _firestoreService.deleteKunde,
+                                  onImportKunden: _firestoreService.importKunden,
+                                  onAddStandort: _firestoreService.addStandort,
+                                  onUpdateStandort: _firestoreService.updateStandort,
+                                  onDeleteStandort: _firestoreService.deleteStandort,
+                                  onAssignGeraet: _firestoreService.assignGeraetToKunde,
+                                  onAddGeraetForKunde: _firestoreService.addGeraetForKunde,
+                                  onAddGeraetForKundeOhneStandort: _firestoreService.addGeraetForKundeOhneStandort,
+                                );
+                              }
+                          );
+                        }
+                    );
+                  },
                 );
               },
             );

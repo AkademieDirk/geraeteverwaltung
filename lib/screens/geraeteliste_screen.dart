@@ -47,10 +47,8 @@ class _GeraeteListeScreenState extends State<GeraeteListeScreen> {
   }
 
   List<Geraet> get _gefilterteGeraete {
-    // 1. Filtert die Gesamtliste, um nur Geräte zu erhalten, die ausgeliefert wurden (keine interne Nummer mehr haben)
     final ausgelieferteGeraete = widget.geraete.where((g) => g.nummer.isEmpty).toList();
 
-    // 2. Wendet den Suchbegriff auf die bereits gefilterte Liste an
     if (_suchbegriff.isEmpty) {
       return ausgelieferteGeraete;
     } else {
@@ -77,7 +75,6 @@ class _GeraeteListeScreenState extends State<GeraeteListeScreen> {
               pw.Text('Seriennummer: ${g.seriennummer}'),
               pw.Text('Kunde: ${g.kundeName ?? 'N/A'}'),
               pw.Text('Standort: ${g.standortName ?? 'N/A'}'),
-              // Hier weitere Details hinzufügen
             ],
           );
         },
@@ -129,7 +126,8 @@ class _GeraeteListeScreenState extends State<GeraeteListeScreen> {
                                 initialGeraet: g,
                                 onSave: widget.onUpdate,
                                 onImport: widget.onImport,
-                                alleGeraete: widget.geraete, // Dieser Parameter wurde hinzugefügt
+                                alleGeraete: widget.geraete,
+                                isBestandsgeraet: true, // Dieser Parameter wurde hinzugefügt
                               ),
                             )),
                             // --- ENDE DER KORREKTUR ---

@@ -2,24 +2,30 @@ import 'package:flutter/material.dart';
 import '../models/geraet.dart';
 import '../models/ersatzteil.dart';
 import '../models/verbautes_teil.dart';
+import '../models/serviceeintrag.dart';
 import 'historie_screen.dart';
 
 class AufbereitungScreen extends StatefulWidget {
   final List<Geraet> alleGeraete;
   final List<Ersatzteil> alleErsatzteile;
   final Map<String, List<VerbautesTeil>> verbauteTeile;
+  final List<Serviceeintrag> alleServiceeintraege;
   final Future<void> Function(String, Ersatzteil, String) onTeilVerbauen;
   final Future<void> Function(String, VerbautesTeil) onDeleteVerbautesTeil;
   final Future<void> Function(String, VerbautesTeil) onUpdateVerbautesTeil;
+  // --- NEU: Funktion zum Löschen von Serviceeinträgen ---
+  final Future<void> Function(String) onDeleteServiceeintrag;
 
   const AufbereitungScreen({
     Key? key,
     required this.alleGeraete,
     required this.alleErsatzteile,
     required this.verbauteTeile,
+    required this.alleServiceeintraege,
     required this.onTeilVerbauen,
     required this.onDeleteVerbautesTeil,
     required this.onUpdateVerbautesTeil,
+    required this.onDeleteServiceeintrag, // --- NEU ---
   }) : super(key: key);
 
   @override
@@ -128,8 +134,10 @@ class _AufbereitungScreenState extends State<AufbereitungScreen> {
                   builder: (context) => HistorieScreen(
                     verbauteTeile: widget.verbauteTeile,
                     alleGeraete: widget.alleGeraete,
+                    alleServiceeintraege: widget.alleServiceeintraege,
                     onDelete: widget.onDeleteVerbautesTeil,
                     onUpdate: widget.onUpdateVerbautesTeil,
+                    onDeleteServiceeintrag: widget.onDeleteServiceeintrag, // <-- HINZUGEFÜGT
                   ),
                 ),
               );
@@ -210,7 +218,7 @@ class _AufbereitungScreenState extends State<AufbereitungScreen> {
                         Container(
                           width: double.infinity,
                           padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(color: Colors.green.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
+                          decoration: BoxDecoration(color: Colors.green.withValues(alpha:0.1), borderRadius: BorderRadius.circular(8)),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [

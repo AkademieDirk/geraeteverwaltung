@@ -1,13 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:excel/excel.dart';
-import '../models/kunde.dart';
-import '../models/standort.dart';
+import '../../../models/geraet.dart';
+import '../../../models/kunde.dart';
+import '../../../models/standort.dart';
 import 'kunden_detail_screen.dart';
 
 class KundenScreen extends StatefulWidget {
   final List<Kunde> kunden;
   final List<Standort> standorte;
+  final List<Geraet> alleGeraete;
   final Future<void> Function(Kunde, Standort) onAdd;
   final Future<void> Function(Kunde) onUpdate;
   final Future<void> Function(String) onDelete;
@@ -15,11 +17,16 @@ class KundenScreen extends StatefulWidget {
   final Future<void> Function(Standort) onUpdateStandort;
   final Future<void> Function(String) onDeleteStandort;
   final Future<void> Function(List<Kunde>) onImport;
+  final Future<void> Function(Geraet, Kunde, Standort) onAddGeraetForKunde;
+  // --- NEU ---
+  final Future<void> Function(Geraet, Kunde) onAddGeraetForKundeOhneStandort;
+
 
   const KundenScreen({
     Key? key,
     required this.kunden,
     required this.standorte,
+    required this.alleGeraete,
     required this.onAdd,
     required this.onUpdate,
     required this.onDelete,
@@ -27,6 +34,8 @@ class KundenScreen extends StatefulWidget {
     required this.onUpdateStandort,
     required this.onDeleteStandort,
     required this.onImport,
+    required this.onAddGeraetForKunde,
+    required this.onAddGeraetForKundeOhneStandort, // --- NEU ---
   }) : super(key: key);
 
   @override
@@ -121,7 +130,6 @@ class _KundenScreenState extends State<KundenScreen> {
   }
 
   void _deleteKunde(Kunde kunde) async {
-    // Diese Funktion bleibt unverändert
     final sicher = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -198,7 +206,6 @@ class _KundenScreenState extends State<KundenScreen> {
                 return Card(
                   child: ExpansionTile(
                     title: Text(kunde.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-                    // --- SUBTITLE ANGEPASST ---
                     subtitle: Text('KNr: ${kunde.kundennummer} | ${kunde.ort.isNotEmpty ? kunde.ort : 'Kein Hauptsitz'}'),
                     leading: CircleAvatar(child: Text(kunde.name.substring(0, 1).toUpperCase())),
                     trailing: Row(
@@ -212,10 +219,13 @@ class _KundenScreenState extends State<KundenScreen> {
                               builder: (_) => KundenDetailScreen(
                                 kunde: kunde,
                                 alleStandorte: widget.standorte,
+                                alleGeraete: widget.alleGeraete,
                                 onUpdateKunde: widget.onUpdate,
                                 onAddStandort: widget.onAddStandort,
                                 onUpdateStandort: widget.onUpdateStandort,
                                 onDeleteStandort: widget.onDeleteStandort,
+                                onAddGeraetForKunde: widget.onAddGeraetForKunde,
+                                onAddGeraetForKundeOhneStandort: widget.onAddGeraetForKundeOhneStandort, // --- NEU ---
                               ),
                             ),
                           ),
@@ -287,7 +297,6 @@ class _KundenAnlegenDialogState extends State<KundenAnlegenDialog> {
   final _ansprechpartnerController = TextEditingController();
   final _telefonController = TextEditingController();
   final _emailController = TextEditingController();
-  // --- NEUE CONTROLLER FÜR KUNDEN-HAUPTSITZ ---
   final _kundeStrasseController = TextEditingController();
   final _kundePlzController = TextEditingController();
   final _kundeOrtController = TextEditingController();
@@ -324,7 +333,6 @@ class _KundenAnlegenDialogState extends State<KundenAnlegenDialog> {
         ansprechpartner: _ansprechpartnerController.text.trim(),
         telefon: _telefonController.text.trim(),
         email: _emailController.text.trim(),
-        // --- NEUE FELDER ZUWEISEN ---
         strasse: _kundeStrasseController.text.trim(),
         plz: _kundePlzController.text.trim(),
         ort: _kundeOrtController.text.trim(),
@@ -366,7 +374,6 @@ class _KundenAnlegenDialogState extends State<KundenAnlegenDialog> {
               TextFormField(controller: _ansprechpartnerController, decoration: const InputDecoration(labelText: 'Ansprechpartner')),
               TextFormField(controller: _telefonController, decoration: const InputDecoration(labelText: 'Telefon')),
               TextFormField(controller: _emailController, decoration: const InputDecoration(labelText: 'E-Mail'), keyboardType: TextInputType.emailAddress),
-              // --- NEUE FORMULARFELDER ---
               TextFormField(controller: _kundeStrasseController, decoration: const InputDecoration(labelText: 'Straße (Hauptsitz)')),
               TextFormField(controller: _kundePlzController, decoration: const InputDecoration(labelText: 'PLZ (Hauptsitz)')),
               TextFormField(controller: _kundeOrtController, decoration: const InputDecoration(labelText: 'Ort (Hauptsitz)')),

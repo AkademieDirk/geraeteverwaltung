@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:file_picker/file_picker.dart';
-import 'package:excel/excel.dart';
+
+
 import '../../models/geraet.dart';
 import '../../widgets/prozent_dropdown.dart';
 import '../../widgets/zubehoer_eingabe_zeile.dart';
@@ -14,6 +14,7 @@ class GeraeteAufnahmeScreen extends StatefulWidget {
   final Future<void> Function(Geraet) onSave;
   final Future<void> Function(List<Geraet>) onImport;
   final List<Geraet> alleGeraete;
+  final bool isBestandsgeraet;
 
   const GeraeteAufnahmeScreen({
     Key? key,
@@ -21,6 +22,7 @@ class GeraeteAufnahmeScreen extends StatefulWidget {
     required this.onSave,
     required this.onImport,
     required this.alleGeraete,
+    this.isBestandsgeraet = false,
   }) : super(key: key);
 
   @override
@@ -30,6 +32,9 @@ class GeraeteAufnahmeScreen extends StatefulWidget {
 class _GeraeteAufnahmeScreenState extends State<GeraeteAufnahmeScreen> {
   final _formKey = GlobalKey<FormState>();
   bool _isImporting = false;
+
+  final _nummerFocusNode = FocusNode();
+  String? _nummerErrorText;
 
   // Dropdown-Optionen
   final List<String> _modellOptionen = [
@@ -80,6 +85,12 @@ class _GeraeteAufnahmeScreenState extends State<GeraeteAufnahmeScreen> {
   @override
   void initState() {
     super.initState();
+    _nummerFocusNode.addListener(() {
+      if (!_nummerFocusNode.hasFocus) {
+        _validateNummer();
+      }
+    });
+
     if (widget.initialGeraet != null) {
       final g = widget.initialGeraet!;
       _nummerController.text = g.nummer;
@@ -133,6 +144,8 @@ class _GeraeteAufnahmeScreenState extends State<GeraeteAufnahmeScreen> {
 
   @override
   void dispose() {
+    _nummerFocusNode.removeListener(_validateNummer);
+    _nummerFocusNode.dispose();
     _nummerController.dispose();
     _seriennummerController.dispose();
     _lieferantController.dispose();
@@ -154,9 +167,27 @@ class _GeraeteAufnahmeScreenState extends State<GeraeteAufnahmeScreen> {
     super.dispose();
   }
 
-  Future<void> _importGeraete() async {
-    // Import-Logik hier...
+  void _validateNummer() {
+    if (widget.isBestandsgeraet) return;
+    final neueNummer = _nummerController.text.trim();
+    if (neueNummer.isEmpty) {
+      setState(() => _nummerErrorText = null);
+      return;
+    }
+    final istDuplikat = widget.alleGeraete.any((geraet) =>
+    geraet.nummer == neueNummer &&
+        geraet.id != widget.initialGeraet?.id
+    );
+    setState(() {
+      if (istDuplikat) {
+        _nummerErrorText = 'Diese Gerätenummer ist bereits vergeben.';
+      } else {
+        _nummerErrorText = null;
+      }
+    });
   }
+
+  Future<void> _importGeraete() async { /* ... unverändert ... */ }
 
   void _updateZaehlerGesamt() {
     setState(() {
@@ -167,25 +198,19 @@ class _GeraeteAufnahmeScreenState extends State<GeraeteAufnahmeScreen> {
   }
 
   void _saveGeraet() async {
-    final neueNummer = _nummerController.text.trim();
-
-    final istDuplikat = widget.alleGeraete.any((geraet) =>
-    geraet.nummer == neueNummer &&
-        geraet.id != widget.initialGeraet?.id
-    );
-
-    if (istDuplikat) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Diese Gerätenummer ist bereits vergeben!'),
-          backgroundColor: Colors.red,
-        ),
-      );
-      return;
+    if (!widget.isBestandsgeraet) {
+      _validateNummer();
+      if (_nummerErrorText != null) {
+        return;
+      }
+      if (_nummerController.text.trim().isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Bitte Gerätenummer und Modell angeben!')));
+        return;
+      }
     }
 
-    if (neueNummer.isEmpty || _selectedModell == 'Nichts ausgewählt') {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Bitte Gerätenummer und Modell angeben!')));
+    if (_selectedModell == 'Nichts ausgewählt') {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Bitte ein Modell angeben!')));
       return;
     }
 
@@ -306,14 +331,36 @@ class _GeraeteAufnahmeScreenState extends State<GeraeteAufnahmeScreen> {
           ),
         ],
       ),
+      // --- ANFANG DER ÄNDERUNG ---
+      // FloatingActionButton für einen prominenten Speichern-Button
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: _saveGeraet,
+        label: const Text('Speichern'),
+        icon: const Icon(Icons.save),
+        backgroundColor: Theme.of(context).primaryColor,
+        foregroundColor: Colors.white,
+      ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
+      // --- ENDE DER ÄNDERUNG ---
+
       body: Padding(
         padding: const EdgeInsets.all(24.0),
         child: Form(
           key: _formKey,
           child: ListView(
+            // Padding unten, damit der Button den Inhalt nicht verdeckt
+            padding: const EdgeInsets.only(bottom: 80),
             children: [
-              TextFormField(controller: _nummerController, decoration: const InputDecoration(labelText: 'Gerätenummer*')),
-              const SizedBox(height: 8),
+              if (!widget.isBestandsgeraet)
+                TextFormField(
+                  controller: _nummerController,
+                  focusNode: _nummerFocusNode,
+                  decoration: InputDecoration(
+                    labelText: 'Gerätenummer*',
+                    errorText: _nummerErrorText,
+                  ),
+                ),
+              if (!widget.isBestandsgeraet) const SizedBox(height: 8),
               DropdownButtonFormField<String>(value: _selectedMitarbeiter, decoration: const InputDecoration(labelText: 'Verantwortlicher Mitarbeiter'), items: _mitarbeiterOptionen.map((m) => DropdownMenuItem(value: m, child: Text(m))).toList(), onChanged: (val) => setState(() => _selectedMitarbeiter = val ?? 'Nichts ausgewählt')),
               const SizedBox(height: 8),
               ListTile(
@@ -342,7 +389,6 @@ class _GeraeteAufnahmeScreenState extends State<GeraeteAufnahmeScreen> {
               const SizedBox(height: 22),
               const Text('Füllstände (in %):', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
               const SizedBox(height: 8),
-              // --- ANFANG DER ÄNDERUNG ---
               Row(children: [
                 ProzentDropdown(label: 'RTB', value: _rtb, onChanged: (val) => setState(() => _rtb = val ?? 0)),
                 const SizedBox(width: 8),
@@ -354,7 +400,6 @@ class _GeraeteAufnahmeScreenState extends State<GeraeteAufnahmeScreen> {
                 const SizedBox(width: 8),
                 ProzentDropdown(label: 'Toner C', value: _tonerC, onChanged: (val) => setState(() => _tonerC = val ?? 0)),
               ]),
-              // --- ENDE DER ÄNDERUNG ---
               const SizedBox(height: 22),
               const Text('Laufzeiten Bildeinheit (jeweils %):', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
               Row(children: [
@@ -392,8 +437,7 @@ class _GeraeteAufnahmeScreenState extends State<GeraeteAufnahmeScreen> {
               ),
               const SizedBox(height: 22),
               TextFormField(controller: _bemerkungController, decoration: const InputDecoration(labelText: 'Bemerkung (frei)', alignLabelWithHint: true), minLines: 2, maxLines: 4),
-              const SizedBox(height: 22),
-              ElevatedButton(onPressed: _saveGeraet, child: const Text('Speichern')),
+              // Der alte Button am Ende der Liste wurde entfernt
             ],
           ),
         ),

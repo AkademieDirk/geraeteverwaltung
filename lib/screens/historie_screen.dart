@@ -2,19 +2,24 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../models/verbautes_teil.dart';
 import '../models/geraet.dart';
+import '../models/serviceeintrag.dart';
 
 class HistorieScreen extends StatefulWidget {
   final Map<String, List<VerbautesTeil>> verbauteTeile;
   final List<Geraet> alleGeraete;
+  final List<Serviceeintrag> alleServiceeintraege;
   final Future<void> Function(String seriennummer, VerbautesTeil teil) onDelete;
   final Future<void> Function(String seriennummer, VerbautesTeil teil) onUpdate;
+  final Future<void> Function(String) onDeleteServiceeintrag;
 
   const HistorieScreen({
     Key? key,
     required this.verbauteTeile,
     required this.alleGeraete,
+    required this.alleServiceeintraege,
     required this.onDelete,
     required this.onUpdate,
+    required this.onDeleteServiceeintrag,
   }) : super(key: key);
 
   @override
@@ -23,7 +28,9 @@ class HistorieScreen extends StatefulWidget {
 
 class _HistorieScreenState extends State<HistorieScreen> {
   final TextEditingController _seriennummerController = TextEditingController();
-  List<VerbautesTeil> _gefundeneTeile = [];
+  List<VerbautesTeil> _aufbereitungsteile = [];
+  List<Serviceeintrag> _serviceeintraege = [];
+
   double _gesamtkosten = 0.0;
   String _angezeigteSeriennummer = '';
   List<String> _suchergebnisse = [];
@@ -35,12 +42,12 @@ class _HistorieScreenState extends State<HistorieScreen> {
     super.dispose();
   }
 
-  // --- GEÄNDERT: Sucht jetzt auch nach Kundennamen ---
   void _sucheHistorie() {
     final suchbegriff = _seriennummerController.text.trim().toLowerCase();
 
     setState(() {
-      _gefundeneTeile = [];
+      _aufbereitungsteile = [];
+      _serviceeintraege = [];
       _angezeigteSeriennummer = '';
       _gesamtkosten = 0.0;
       _suchergebnisse = [];
@@ -49,19 +56,19 @@ class _HistorieScreenState extends State<HistorieScreen> {
 
     if (suchbegriff.isEmpty) return;
 
-    // Findet alle Geräte, die zum Suchbegriff passen (SN oder Kundenname)
     final passendeGeraete = widget.alleGeraete.where((geraet) {
       final seriennummerMatch = geraet.seriennummer.toLowerCase().contains(suchbegriff);
       final kundenNameMatch = geraet.kundeName?.toLowerCase().contains(suchbegriff) ?? false;
       return seriennummerMatch || kundenNameMatch;
     }).toList();
 
-    // Sammelt die Seriennummern der gefundenen Geräte, für die eine Historie existiert
-    final treffer = passendeGeraete
-        .map((g) => g.seriennummer)
-        .where((sn) => widget.verbauteTeile.containsKey(sn) && widget.verbauteTeile[sn]!.isNotEmpty)
-        .toSet() // toSet, um Duplikate zu vermeiden
-        .toList();
+    final treffer = passendeGeraete.map((g) => g.id).toSet().where((geraeteId) {
+      final geraet = widget.alleGeraete.firstWhere((g) => g.id == geraeteId);
+      final hatTeile = widget.verbauteTeile.containsKey(geraet.seriennummer) && widget.verbauteTeile[geraet.seriennummer]!.isNotEmpty;
+      final hatService = widget.alleServiceeintraege.any((e) => e.geraeteId == geraeteId);
+      return hatTeile || hatService;
+    }).map((geraeteId) => widget.alleGeraete.firstWhere((g) => g.id == geraeteId).seriennummer).toList();
+
 
     if (treffer.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -77,9 +84,6 @@ class _HistorieScreenState extends State<HistorieScreen> {
   }
 
   void _zeigeHistorieFuer(String seriennummer) {
-    final teile = widget.verbauteTeile[seriennummer]!;
-    final summe = teile.fold(0.0, (total, verbautesTeil) => total + verbautesTeil.tatsaechlicherPreis);
-
     Geraet? zugehoerigesGeraet;
     try {
       zugehoerigesGeraet = widget.alleGeraete.firstWhere((g) => g.seriennummer == seriennummer);
@@ -87,9 +91,21 @@ class _HistorieScreenState extends State<HistorieScreen> {
       zugehoerigesGeraet = null;
     }
 
+    if (zugehoerigesGeraet == null) return;
+
+    final serviceEintraege = widget.alleServiceeintraege.where((e) => e.geraeteId == zugehoerigesGeraet!.id).toList();
+    serviceEintraege.sort((a, b) => b.datum.compareTo(a.datum));
+
+    final alleVerbautenTeile = widget.verbauteTeile[seriennummer] ?? [];
+    final inServiceVerbauteTeileIDs = serviceEintraege.expand((e) => e.verbauteTeile).map((t) => t.id).toSet();
+    final aufbereitungsteile = alleVerbautenTeile.where((t) => !inServiceVerbauteTeileIDs.contains(t.id)).toList();
+
+    final teileKosten = alleVerbautenTeile.fold(0.0, (total, item) => total + item.tatsaechlicherPreis);
+
     setState(() {
-      _gefundeneTeile = teile;
-      _gesamtkosten = summe;
+      _serviceeintraege = serviceEintraege;
+      _aufbereitungsteile = aufbereitungsteile;
+      _gesamtkosten = teileKosten;
       _angezeigteSeriennummer = seriennummer;
       _suchergebnisse = [];
       _seriennummerController.text = seriennummer;
@@ -103,16 +119,39 @@ class _HistorieScreenState extends State<HistorieScreen> {
       try {
         await widget.onDelete(_angezeigteSeriennummer, teil);
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Eintrag erfolgreich gelöscht.'), backgroundColor: Colors.green));
+        _zeigeHistorieFuer(_angezeigteSeriennummer);
       } catch (e) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Fehler beim Löschen: ${e.toString()}'), backgroundColor: Colors.red));
       }
     }
   }
 
+  void _loescheServiceeintrag(Serviceeintrag eintrag) async {
+    final sicher = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Serviceeintrag löschen?'),
+        content: Text('Soll der Serviceeintrag vom ${DateFormat('dd.MM.yyyy').format(eintrag.datum.toDate())} wirklich gelöscht werden?'),
+        actions: [
+          TextButton(child: const Text('Abbrechen'), onPressed: () => Navigator.pop(ctx, false)),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Löschen'),
+            onPressed: () => Navigator.pop(ctx, true),
+          ),
+        ],
+      ),
+    );
+    if (sicher == true) {
+      await widget.onDeleteServiceeintrag(eintrag.id);
+      _zeigeHistorieFuer(_angezeigteSeriennummer);
+    }
+  }
+
   void _bearbeiteVerbautesTeilDialog(VerbautesTeil teil) {
     final preisController = TextEditingController(text: teil.tatsaechlicherPreis.toStringAsFixed(2));
     final bemerkungController = TextEditingController(text: teil.bemerkung);
-    showDialog(context: context, builder: (context) => AlertDialog(title: Text('Eintrag bearbeiten'), content: Column(mainAxisSize: MainAxisSize.min, children: [Text(teil.ersatzteil.bezeichnung, style: TextStyle(fontWeight: FontWeight.bold)), SizedBox(height: 16), TextField(controller: preisController, decoration: InputDecoration(labelText: 'Tatsächlicher Preis', border: OutlineInputBorder(), suffixText: '€'), keyboardType: TextInputType.numberWithOptions(decimal: true)), SizedBox(height: 16), TextField(controller: bemerkungController, decoration: InputDecoration(labelText: 'Bemerkung (z.B. Abweichung)', border: OutlineInputBorder()), maxLines: 2)]), actions: [TextButton(onPressed: () => Navigator.pop(context), child: Text('Abbrechen')), ElevatedButton(onPressed: () async { final neuerPreis = double.tryParse(preisController.text.replaceAll(',', '.')) ?? teil.tatsaechlicherPreis; final geandertesTeil = VerbautesTeil(id: teil.id, ersatzteil: teil.ersatzteil, installationsDatum: teil.installationsDatum, tatsaechlicherPreis: neuerPreis, bemerkung: bemerkungController.text.trim(), herkunftslager: teil.herkunftslager); await widget.onUpdate(_angezeigteSeriennummer, geandertesTeil); Navigator.pop(context); }, child: Text('Speichern'))]));
+    showDialog(context: context, builder: (context) => AlertDialog(title: Text('Eintrag bearbeiten'), content: Column(mainAxisSize: MainAxisSize.min, children: [Text(teil.ersatzteil.bezeichnung, style: TextStyle(fontWeight: FontWeight.bold)), SizedBox(height: 16), TextField(controller: preisController, decoration: InputDecoration(labelText: 'Tatsächlicher Preis', border: OutlineInputBorder(), suffixText: '€'), keyboardType: TextInputType.numberWithOptions(decimal: true)), SizedBox(height: 16), TextField(controller: bemerkungController, decoration: InputDecoration(labelText: 'Bemerkung (z.B. Abweichung)', border: OutlineInputBorder()), maxLines: 2)]), actions: [TextButton(onPressed: () => Navigator.pop(context), child: Text('Abbrechen')), ElevatedButton(onPressed: () async { final neuerPreis = double.tryParse(preisController.text.replaceAll(',', '.')) ?? teil.tatsaechlicherPreis; final geandertesTeil = VerbautesTeil(id: teil.id, ersatzteil: teil.ersatzteil, installationsDatum: teil.installationsDatum, tatsaechlicherPreis: neuerPreis, bemerkung: bemerkungController.text.trim(), herkunftslager: teil.herkunftslager); await widget.onUpdate(_angezeigteSeriennummer, geandertesTeil); Navigator.pop(context); _zeigeHistorieFuer(_angezeigteSeriennummer); }, child: Text('Speichern'))]));
   }
 
   @override
@@ -182,8 +221,8 @@ class _HistorieScreenState extends State<HistorieScreen> {
     if (_angezeigteSeriennummer.isEmpty) {
       return const Center(key: ValueKey('leere_ansicht'), child: Text('Bitte eine Seriennummer oder einen Kunden eingeben.'));
     }
-    if (_gefundeneTeile.isEmpty) {
-      return Center(key: ValueKey('keine_teile'), child: Text('Für die Seriennummer $_angezeigteSeriennummer wurden keine Teile verbaut.'));
+    if (_aufbereitungsteile.isEmpty && _serviceeintraege.isEmpty) {
+      return Center(key: ValueKey('keine_eintraege'), child: Text('Für die Seriennummer $_angezeigteSeriennummer wurden keine Einträge gefunden.'));
     }
     return Column(
       key: ValueKey(_angezeigteSeriennummer),
@@ -193,7 +232,7 @@ class _HistorieScreenState extends State<HistorieScreen> {
           color: Theme.of(context).primaryColor,
           child: Padding(
             padding: const EdgeInsets.all(16.0),
-            child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text('Gesamtkosten:', style: Theme.of(context).textTheme.titleLarge?.copyWith(color: Colors.white, fontWeight: FontWeight.bold)), Text('${_gesamtkosten.toStringAsFixed(2)} €', style: Theme.of(context).textTheme.headlineSmall?.copyWith(color: Colors.white, fontWeight: FontWeight.bold))]),
+            child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Text('Gesamtkosten Teile:', style: Theme.of(context).textTheme.titleLarge?.copyWith(color: Colors.white, fontWeight: FontWeight.bold)), Text('${_gesamtkosten.toStringAsFixed(2)} €', style: Theme.of(context).textTheme.headlineSmall?.copyWith(color: Colors.white, fontWeight: FontWeight.bold))]),
           ),
         ),
         const SizedBox(height: 16),
@@ -205,34 +244,87 @@ class _HistorieScreenState extends State<HistorieScreen> {
           ),
         const SizedBox(height: 8),
         Expanded(
-          child: ListView.builder(
-            itemCount: _gefundeneTeile.length,
-            itemBuilder: (context, index) {
-              final verbautes = _gefundeneTeile[index];
-              final teil = verbautes.ersatzteil;
-              final datum = DateFormat('dd.MM.yyyy').format(verbautes.installationsDatum);
-              return Card(
-                margin: const EdgeInsets.symmetric(vertical: 6),
-                child: ExpansionTile(
-                  title: Text(teil.bezeichnung, style: const TextStyle(fontWeight: FontWeight.bold)),
-                  subtitle: Text('Verbaut am: $datum', style: TextStyle(color: Colors.grey.shade600)),
-                  leading: CircleAvatar(child: Text((index + 1).toString())),
-                  trailing: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      IconButton(icon: const Icon(Icons.edit_note, color: Colors.blue), tooltip: 'Diesen Eintrag bearbeiten', onPressed: () => _bearbeiteVerbautesTeilDialog(verbautes)),
-                      IconButton(icon: const Icon(Icons.delete_outline, color: Colors.red), tooltip: 'Diesen Eintrag löschen', onPressed: () => _loescheVerbautesTeil(verbautes)),
-                    ],
+          child: ListView(
+            children: [
+              // --- ANFANG DER ÄNDERUNG ---
+              if (_aufbereitungsteile.isNotEmpty)
+                Card(
+                  child: ExpansionTile(
+                    leading: const Icon(Icons.inventory_2, color: Colors.blueGrey),
+                    // 1. Text geändert
+                    title: Text('Teile verbaut (${_aufbereitungsteile.length})', style: const TextStyle(fontWeight: FontWeight.bold)),
+                    children: _aufbereitungsteile.map((teil) {
+                      // 2. ListTile durch ExpansionTile ersetzt, um Buttons anzuzeigen
+                      return ExpansionTile(
+                        leading: const SizedBox(width: 24), // Einrücken für bessere Optik
+                        title: Text(teil.ersatzteil.bezeichnung),
+                        subtitle: Text('Eingebaut am: ${DateFormat('dd.MM.yyyy').format(teil.installationsDatum)}'),
+                        trailing: Text('${teil.tatsaechlicherPreis.toStringAsFixed(2)} €'),
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            children: [
+                              TextButton.icon(
+                                icon: const Icon(Icons.edit_note),
+                                label: const Text('Bearbeiten'),
+                                onPressed: () => _bearbeiteVerbautesTeilDialog(teil),
+                                style: TextButton.styleFrom(foregroundColor: Colors.blue),
+                              ),
+                              TextButton.icon(
+                                icon: const Icon(Icons.delete_outline),
+                                label: const Text('Löschen'),
+                                onPressed: () => _loescheVerbautesTeil(teil),
+                                style: TextButton.styleFrom(foregroundColor: Colors.red),
+                              ),
+                            ],
+                          )
+                        ],
+                      );
+                    }).toList(),
                   ),
-                  children: [
-                    ListTile(title: Text('${verbautes.tatsaechlicherPreis.toStringAsFixed(2)} €'), subtitle: const Text('Tatsächlicher Preis'), leading: const Icon(Icons.euro_symbol)),
-                    if (verbautes.bemerkung.isNotEmpty) ListTile(title: Text(verbautes.bemerkung), subtitle: const Text('Bemerkung'), leading: const Icon(Icons.notes)),
-                    ListTile(title: Text(teil.artikelnummer), subtitle: const Text('Artikelnummer'), leading: const Icon(Icons.qr_code)),
-                    ListTile(title: Text('aus: ${verbautes.herkunftslager}'), subtitle: const Text('Herkunftslager'), leading: const Icon(Icons.warehouse)),
-                  ],
                 ),
-              );
-            },
+              // --- ENDE DER ÄNDERUNG ---
+
+              if (_serviceeintraege.isNotEmpty)
+                ..._serviceeintraege.map((eintrag) {
+                  return Card(
+                    margin: const EdgeInsets.only(top: 8),
+                    child: ExpansionTile(
+                      leading: const Icon(Icons.miscellaneous_services, color: Colors.orange),
+                      title: Text('Service vom ${DateFormat('dd.MM.yyyy').format(eintrag.datum.toDate())}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                      subtitle: Text(eintrag.verantwortlicherMitarbeiter),
+                      trailing: IconButton(
+                        icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
+                        onPressed: () => _loescheServiceeintrag(eintrag),
+                      ),
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text('Ausgeführte Arbeiten:', style: TextStyle(fontWeight: FontWeight.bold)),
+                              Text(eintrag.ausgefuehrteArbeiten.isEmpty ? 'Keine Beschreibung.' : eintrag.ausgefuehrteArbeiten),
+                              if (eintrag.verbauteTeile.isNotEmpty) ...[
+                                const Divider(height: 20),
+                                const Text('Verbaute Teile bei diesem Service:', style: TextStyle(fontWeight: FontWeight.bold)),
+                                ...eintrag.verbauteTeile.map((teil) {
+                                  return ListTile(
+                                    dense: true,
+                                    leading: const Icon(Icons.settings, size: 18),
+                                    title: Text(teil.ersatzteil.bezeichnung),
+                                    trailing: Text('${teil.tatsaechlicherPreis.toStringAsFixed(2)} €'),
+                                  );
+                                }).toList()
+                              ]
+                            ],
+                          ),
+                        )
+                      ],
+                    ),
+                  );
+                }),
+            ],
           ),
         ),
       ],

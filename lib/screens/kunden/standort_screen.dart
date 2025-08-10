@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import '../models/kunde.dart';
-import '../models/standort.dart';
+import '../../../models/kunde.dart';
+import '../../../models/standort.dart';
 
 class StandortScreen extends StatefulWidget {
   final Kunde kunde;

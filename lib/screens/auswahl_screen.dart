@@ -5,14 +5,15 @@ import 'geraeteliste_screen.dart';
 import 'aufbereitung_screen.dart';
 import 'lagerverwaltung_screen.dart';
 import 'historie_screen.dart';
-import 'service_screen.dart';
-import 'kunden_screen.dart';
+import 'service/service_screen.dart';
+import 'kunden/kunden_screen.dart';
 import 'bestandsliste_screen.dart';
 import '../models/geraet.dart';
 import '../models/ersatzteil.dart';
 import '../models/verbautes_teil.dart';
 import '../models/kunde.dart';
 import '../models/standort.dart';
+import '../models/serviceeintrag.dart';
 import '../widgets/selection_box.dart';
 
 class AuswahlScreen extends StatelessWidget {
@@ -21,6 +22,7 @@ class AuswahlScreen extends StatelessWidget {
   final Map<String, List<VerbautesTeil>> verbauteTeile;
   final List<Kunde> kunden;
   final List<Standort> standorte;
+  final List<Serviceeintrag> serviceeintraege;
 
   final Future<void> Function(Geraet) onAddGeraet;
   final Future<void> Function(Geraet) onUpdateGeraet;
@@ -31,6 +33,7 @@ class AuswahlScreen extends StatelessWidget {
   final Future<void> Function(Ersatzteil) onUpdateErsatzteil;
   final Future<void> Function(String) onDeleteErsatzteil;
 
+  // --- KORRIGIERTE SIGNATUR ---
   final Future<void> Function(String, Ersatzteil, String) onTeilVerbauen;
   final Future<void> Function(String, VerbautesTeil) onDeleteVerbautesTeil;
   final Future<void> Function(String, VerbautesTeil) onUpdateVerbautesTeil;
@@ -47,6 +50,12 @@ class AuswahlScreen extends StatelessWidget {
   final Future<void> Function(String) onDeleteStandort;
 
   final Future<void> Function(Geraet, Kunde, Standort) onAssignGeraet;
+  final Future<void> Function(Geraet, Kunde, Standort) onAddGeraetForKunde;
+  final Future<void> Function(Geraet, Kunde) onAddGeraetForKundeOhneStandort;
+
+  final Future<void> Function(Serviceeintrag) onAddServiceeintrag;
+  final Future<void> Function(Serviceeintrag) onUpdateServiceeintrag;
+  final Future<void> Function(String) onDeleteServiceeintrag;
 
   const AuswahlScreen({
     Key? key,
@@ -55,6 +64,7 @@ class AuswahlScreen extends StatelessWidget {
     required this.verbauteTeile,
     required this.kunden,
     required this.standorte,
+    required this.serviceeintraege,
     required this.onAddGeraet,
     required this.onUpdateGeraet,
     required this.onDeleteGeraet,
@@ -75,6 +85,11 @@ class AuswahlScreen extends StatelessWidget {
     required this.onUpdateStandort,
     required this.onDeleteStandort,
     required this.onAssignGeraet,
+    required this.onAddGeraetForKunde,
+    required this.onAddGeraetForKundeOhneStandort,
+    required this.onAddServiceeintrag,
+    required this.onUpdateServiceeintrag,
+    required this.onDeleteServiceeintrag,
   }) : super(key: key);
 
   @override
@@ -88,22 +103,87 @@ class AuswahlScreen extends StatelessWidget {
           builder: (_) => GeraeteAufnahmeScreen(
             onSave: onAddGeraet,
             onImport: onImportGeraete,
-            alleGeraete: geraete, // <-- HINZUGEFÜGT
+            alleGeraete: geraete,
           ),
         )),
       },
-      {'title': 'Aufbereitung', 'icon': Icons.build, 'color': Colors.deepPurple, 'onTap': () => Navigator.push(context, MaterialPageRoute(builder: (_) => AufbereitungScreen(alleGeraete: geraete, alleErsatzteile: ersatzteile, verbauteTeile: verbauteTeile, onTeilVerbauen: onTeilVerbauen, onDeleteVerbautesTeil: onDeleteVerbautesTeil, onUpdateVerbautesTeil: onUpdateVerbautesTeil)))},
-      {'title': 'Service', 'icon': Icons.miscellaneous_services, 'color': Colors.orange, 'onTap': () => Navigator.push(context, MaterialPageRoute(builder: (_) => ServiceScreen(alleGeraete: geraete, alleErsatzteile: ersatzteile, verbauteTeile: verbauteTeile, onTeilVerbauen: onTeilVerbauen, onDeleteVerbautesTeil: onDeleteVerbautesTeil, onUpdateVerbautesTeil: onUpdateVerbautesTeil)))},
+      {
+        'title': 'Aufbereitung',
+        'icon': Icons.build,
+        'color': Colors.deepPurple,
+        'onTap': () => Navigator.push(context, MaterialPageRoute(
+          builder: (_) => AufbereitungScreen(
+            alleGeraete: geraete,
+            alleErsatzteile: ersatzteile,
+            verbauteTeile: verbauteTeile,
+            alleServiceeintraege: serviceeintraege,
+            onTeilVerbauen: onTeilVerbauen,
+            onDeleteVerbautesTeil: onDeleteVerbautesTeil,
+            onUpdateVerbautesTeil: onUpdateVerbautesTeil,
+            onDeleteServiceeintrag: onDeleteServiceeintrag,
+          ),
+        )),
+      },
+      {
+        'title': 'Service',
+        'icon': Icons.miscellaneous_services,
+        'color': Colors.orange,
+        'onTap': () => Navigator.push(context, MaterialPageRoute(
+          builder: (_) => ServiceScreen(
+            alleGeraete: geraete,
+            alleErsatzteile: ersatzteile,
+            alleServiceeintraege: serviceeintraege,
+            onAddServiceeintrag: onAddServiceeintrag,
+            onUpdateServiceeintrag: onUpdateServiceeintrag,
+            onDeleteServiceeintrag: onDeleteServiceeintrag,
+            onTeilVerbauen: onTeilVerbauen,
+          ),
+        )),
+      },
     ];
 
     final List<Map<String, dynamic>> uebersichten = [
       {'title': 'Bestandsliste', 'icon': Icons.inventory, 'color': Colors.blueAccent, 'onTap': () => Navigator.push(context, MaterialPageRoute(builder: (_) => BestandslisteScreen(alleGeraete: geraete, onUpdate: onUpdateGeraet, onDelete: onDeleteGeraet, kunden: kunden, standorte: standorte, onAssign: onAssignGeraet, onImport: onImportGeraete)))},
       {'title': 'Geräteliste (Alle)', 'icon': Icons.list_alt, 'color': Colors.green, 'onTap': () => Navigator.push(context, MaterialPageRoute(builder: (_) => GeraeteListeScreen(geraete: geraete, onUpdate: onUpdateGeraet, onDelete: onDeleteGeraet, kunden: kunden, standorte: standorte, onAssign: onAssignGeraet, onImport: onImportGeraete)))},
-      {'title': 'Historie', 'icon': Icons.history, 'color': Colors.teal, 'onTap': () => Navigator.push(context, MaterialPageRoute(builder: (_) => HistorieScreen(verbauteTeile: verbauteTeile, alleGeraete: geraete, onDelete: onDeleteVerbautesTeil, onUpdate: onUpdateVerbautesTeil)))},
+      {
+        'title': 'Historie',
+        'icon': Icons.history,
+        'color': Colors.teal,
+        'onTap': () => Navigator.push(context, MaterialPageRoute(
+          builder: (_) => HistorieScreen(
+            verbauteTeile: verbauteTeile,
+            alleGeraete: geraete,
+            alleServiceeintraege: serviceeintraege,
+            onDelete: onDeleteVerbautesTeil,
+            onUpdate: onUpdateVerbautesTeil,
+            onDeleteServiceeintrag: onDeleteServiceeintrag,
+          ),
+        )),
+      },
     ];
 
     final List<Map<String, dynamic>> verwaltung = [
-      {'title': 'Kundenverwaltung', 'icon': Icons.people, 'color': Colors.red.shade400, 'onTap': () => Navigator.push(context, MaterialPageRoute(builder: (_) => KundenScreen(kunden: kunden, standorte: standorte, onAdd: onAddKunde, onUpdate: onUpdateKunde, onDelete: onDeleteKunde, onAddStandort: onAddStandort, onUpdateStandort: onUpdateStandort, onDeleteStandort: onDeleteStandort, onImport: onImportKunden)))},
+      {
+        'title': 'Kundenverwaltung',
+        'icon': Icons.people,
+        'color': Colors.red.shade400,
+        'onTap': () => Navigator.push(context, MaterialPageRoute(
+          builder: (_) => KundenScreen(
+            kunden: kunden,
+            standorte: standorte,
+            alleGeraete: geraete,
+            onAdd: onAddKunde,
+            onUpdate: onUpdateKunde,
+            onDelete: onDeleteKunde,
+            onAddStandort: onAddStandort,
+            onUpdateStandort: onUpdateStandort,
+            onDeleteStandort: onDeleteStandort,
+            onImport: onImportKunden,
+            onAddGeraetForKunde: onAddGeraetForKunde,
+            onAddGeraetForKundeOhneStandort: onAddGeraetForKundeOhneStandort,
+          ),
+        )),
+      },
       {'title': 'Lagerverwaltung', 'icon': Icons.warehouse, 'color': Colors.brown, 'onTap': () => Navigator.push(context, MaterialPageRoute(builder: (_) => LagerverwaltungScreen(ersatzteile: ersatzteile, onAdd: onAddErsatzteil, onUpdate: onUpdateErsatzteil, onDelete: onDeleteErsatzteil, onTransfer: onTransfer, onBookIn: onBookIn)))},
     ];
 
