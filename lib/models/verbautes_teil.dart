@@ -5,39 +5,58 @@ class VerbautesTeil {
   final String id;
   final Ersatzteil ersatzteil;
   final DateTime installationsDatum;
-  final String bemerkung;
   final double tatsaechlicherPreis;
+  final String bemerkung;
   final String herkunftslager;
+  final int menge;
 
   VerbautesTeil({
     required this.id,
     required this.ersatzteil,
     required this.installationsDatum,
-    this.bemerkung = '',
     required this.tatsaechlicherPreis,
-    required this.herkunftslager, // KORREKTUR: Fehlender Parameter hinzugefügt
+    this.bemerkung = '',
+    required this.herkunftslager,
+    this.menge = 1,
   });
 
   Map<String, dynamic> toJson() {
     return {
       'id': id,
       'ersatzteil': ersatzteil.toJson(),
-      'ersatzteilId': ersatzteil.id,
-      'installationsDatum': Timestamp.fromDate(installationsDatum),
-      'bemerkung': bemerkung,
+      'installationsDatum': installationsDatum.toIso8601String(),
       'tatsaechlicherPreis': tatsaechlicherPreis,
+      'bemerkung': bemerkung,
       'herkunftslager': herkunftslager,
+      'menge': menge,
     };
   }
 
-  static VerbautesTeil fromMap(Map<String, dynamic> map) {
+  factory VerbautesTeil.fromMap(Map<String, dynamic> map) {
+    // --- ANFANG DER KORREKTUR ---
+    DateTime installationsDatum;
+    final rawDatum = map['installationsDatum'];
+
+    if (rawDatum is Timestamp) {
+      // Wenn das Datum ein Firestore-Timestamp ist, wandle es um.
+      installationsDatum = rawDatum.toDate();
+    } else if (rawDatum is String) {
+      // Wenn es ein String ist, parse es.
+      installationsDatum = DateTime.parse(rawDatum);
+    } else {
+      // Fallback, falls das Feld fehlt oder null ist.
+      installationsDatum = DateTime.now();
+    }
+    // --- ENDE DER KORREKTUR ---
+
     return VerbautesTeil(
       id: map['id'] ?? '',
       ersatzteil: Ersatzteil.fromMap(map['ersatzteil']),
-      installationsDatum: (map['installationsDatum'] as Timestamp).toDate(),
-      bemerkung: map['bemerkung'] ?? '',
+      installationsDatum: installationsDatum, // Das umgewandelte Datum wird verwendet
       tatsaechlicherPreis: (map['tatsaechlicherPreis'] as num?)?.toDouble() ?? 0.0,
-      herkunftslager: map['herkunftslager'] ?? 'Unbekannt',
+      bemerkung: map['bemerkung'] ?? '',
+      herkunftslager: map['herkunftslager'] ?? '',
+      menge: map['menge'] ?? 1,
     );
   }
 }

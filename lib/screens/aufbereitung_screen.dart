@@ -10,10 +10,10 @@ class AufbereitungScreen extends StatefulWidget {
   final List<Ersatzteil> alleErsatzteile;
   final Map<String, List<VerbautesTeil>> verbauteTeile;
   final List<Serviceeintrag> alleServiceeintraege;
-  final Future<void> Function(String, Ersatzteil, String) onTeilVerbauen;
+  // --- KORRIGIERTE SIGNATUR ---
+  final Future<void> Function(String, Ersatzteil, String, int) onTeilVerbauen;
   final Future<void> Function(String, VerbautesTeil) onDeleteVerbautesTeil;
   final Future<void> Function(String, VerbautesTeil) onUpdateVerbautesTeil;
-  // --- NEU: Funktion zum Löschen von Serviceeinträgen ---
   final Future<void> Function(String) onDeleteServiceeintrag;
 
   const AufbereitungScreen({
@@ -25,7 +25,7 @@ class AufbereitungScreen extends StatefulWidget {
     required this.onTeilVerbauen,
     required this.onDeleteVerbautesTeil,
     required this.onUpdateVerbautesTeil,
-    required this.onDeleteServiceeintrag, // --- NEU ---
+    required this.onDeleteServiceeintrag,
   }) : super(key: key);
 
   @override
@@ -89,22 +89,22 @@ class _AufbereitungScreenState extends State<AufbereitungScreen> {
     }
   }
 
+  // --- LOGIK ZUM VERBAUEN ANGEPASST ---
   void _verbaueTeil() async {
     if (_gefundenesGeraet == null || _foundArticle == null || _selectedLager == null) {
       _showSnackbar(context, 'Bitte zuerst Gerät, Lager und Ersatzteil auswählen.');
       return;
     }
-    if ((_foundArticle!.lagerbestaende[_selectedLager!] ?? 0) <= 0) {
-      _showSnackbar(context, 'Fehler: Dieses Teil ist im Lager "$_selectedLager" nicht mehr vorhanden.');
-      return;
-    }
+
+    final menge = await _showMengenEingabeDialog(_foundArticle!.lagerbestaende[_selectedLager!] ?? 0);
+    if (menge == null || menge <= 0) return;
 
     final seriennummer = _gefundenesGeraet!.seriennummer;
     final verbautesTeil = _foundArticle!;
 
     try {
-      await widget.onTeilVerbauen(seriennummer, verbautesTeil, _selectedLager!);
-      _showSnackbar(context, '${verbautesTeil.bezeichnung} wurde verbaut.');
+      await widget.onTeilVerbauen(seriennummer, verbautesTeil, _selectedLager!, menge);
+      _showSnackbar(context, '$menge x ${verbautesTeil.bezeichnung} wurde(n) verbaut.');
       setState(() {
         _foundArticle = null;
         _selectedErsatzteil = null;
@@ -116,6 +116,44 @@ class _AufbereitungScreenState extends State<AufbereitungScreen> {
     } catch (e) {
       _showSnackbar(context, 'Fehler beim Verbuchen: ${e.toString()}');
     }
+  }
+
+  // --- NEUER DIALOG FÜR MENGENEINGABE ---
+  Future<int?> _showMengenEingabeDialog(int maxMenge) {
+    final controller = TextEditingController(text: '1');
+    return showDialog<int>(
+        context: context,
+        builder: (context) {
+          return AlertDialog(
+            title: Text('Menge eingeben'),
+            content: TextField(
+              controller: controller,
+              keyboardType: TextInputType.number,
+              autofocus: true,
+              decoration: InputDecoration(
+                labelText: 'Anzahl',
+                hintText: 'Maximal verfügbar: $maxMenge',
+              ),
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.of(context).pop(), child: Text('Abbrechen')),
+              ElevatedButton(
+                onPressed: () {
+                  final menge = int.tryParse(controller.text) ?? 0;
+                  if (menge > 0 && menge <= maxMenge) {
+                    Navigator.of(context).pop(menge);
+                  } else {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Ungültige Menge. Bitte eine Zahl zwischen 1 und $maxMenge eingeben.'), backgroundColor: Colors.red),
+                    );
+                  }
+                },
+                child: Text('Bestätigen'),
+              ),
+            ],
+          );
+        }
+    );
   }
 
   @override
@@ -137,7 +175,7 @@ class _AufbereitungScreenState extends State<AufbereitungScreen> {
                     alleServiceeintraege: widget.alleServiceeintraege,
                     onDelete: widget.onDeleteVerbautesTeil,
                     onUpdate: widget.onUpdateVerbautesTeil,
-                    onDeleteServiceeintrag: widget.onDeleteServiceeintrag, // <-- HINZUGEFÜGT
+                    onDeleteServiceeintrag: widget.onDeleteServiceeintrag,
                   ),
                 ),
               );
@@ -218,7 +256,7 @@ class _AufbereitungScreenState extends State<AufbereitungScreen> {
                         Container(
                           width: double.infinity,
                           padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(color: Colors.green.withValues(alpha:0.1), borderRadius: BorderRadius.circular(8)),
+                          decoration: BoxDecoration(color: Colors.green.withAlpha(26), borderRadius: BorderRadius.circular(8)),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [

@@ -48,8 +48,8 @@ dependencies:
   uuid: ^4.4.0
 
   # PDF Generation and Printing
-  pdf: ^3.10.8
-  printing: ^5.14.1
+  pdf: ^3.11.3
+  printing: ^5.14.2
 
 
 dev_dependencies:

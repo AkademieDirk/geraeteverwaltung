@@ -34,7 +34,7 @@ class AuswahlScreen extends StatelessWidget {
   final Future<void> Function(String) onDeleteErsatzteil;
 
   // --- KORRIGIERTE SIGNATUR ---
-  final Future<void> Function(String, Ersatzteil, String) onTeilVerbauen;
+  final Future<void> Function(String, Ersatzteil, String, int) onTeilVerbauen;
   final Future<void> Function(String, VerbautesTeil) onDeleteVerbautesTeil;
   final Future<void> Function(String, VerbautesTeil) onUpdateVerbautesTeil;
   final Future<void> Function(Ersatzteil, String, String, int) onTransfer;

@@ -51,6 +51,8 @@ class Geraet {
   String? kundeName;
   String? standortId;
   String? standortName;
+  // --- NEUES FELD ---
+  String maschinenblattErstellt;
 
   Geraet({
     this.id = '',
@@ -103,6 +105,7 @@ class Geraet {
     this.kundeName,
     this.standortId,
     this.standortName,
+    this.maschinenblattErstellt = 'Nein',
   });
 
   Map<String, dynamic> toJson() {
@@ -156,10 +159,11 @@ class Geraet {
       'kundeName': kundeName,
       'standortId': standortId,
       'standortName': standortName,
+      'maschinenblattErstellt': maschinenblattErstellt,
     };
   }
 
-  // --- ANFANG DER NEUEN METHODE ---
+  // --- KORRIGIERT UND VERVOLLSTÄNDIGT ---
   Geraet copyWith({
     String? id,
     String? nummer,
@@ -211,6 +215,7 @@ class Geraet {
     String? kundeName,
     String? standortId,
     String? standortName,
+    String? maschinenblattErstellt,
   }) {
     return Geraet(
       id: id ?? this.id,
@@ -263,9 +268,9 @@ class Geraet {
       kundeName: kundeName ?? this.kundeName,
       standortId: standortId ?? this.standortId,
       standortName: standortName ?? this.standortName,
+      maschinenblattErstellt: maschinenblattErstellt ?? this.maschinenblattErstellt,
     );
   }
-  // --- ENDE DER NEUEN METHODE ---
 
   static Geraet fromFirestore(DocumentSnapshot<Map<String, dynamic>> doc) {
     Map<String, dynamic> data = doc.data()!;
@@ -320,6 +325,7 @@ class Geraet {
       kundeName: data['kundeName'],
       standortId: data['standortId'],
       standortName: data['standortName'],
+      maschinenblattErstellt: data['maschinenblattErstellt'] ?? 'Nein',
     );
   }
 }

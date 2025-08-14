@@ -7,10 +7,7 @@ class BestandslisteGruppe extends StatelessWidget {
   final List<Geraet> geraeteInGruppe;
   final List<Geraet> alleGeraete;
   final Future<void> Function(Geraet) onUpdate;
-  // --- ANFANG DER KORREKTUR ---
-  // Der Typ der Funktion wurde hier korrigiert, um den Fehler zu beheben.
   final Future<void> Function(List<Geraet>) onImport;
-  // --- ENDE DER KORREKTUR ---
   final Function(Geraet) onShowZuordnungsDialog;
   final Function(Geraet) onShowDeleteDialog;
 
@@ -36,6 +33,13 @@ class BestandslisteGruppe extends StatelessWidget {
           style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
         ),
         children: geraeteInGruppe.map((g) {
+          // --- ANFANG DER ÄNDERUNG ---
+          // Bestimmt die Farbe und das Icon basierend auf dem Status
+          final bool maschinenblattVorhanden = g.maschinenblattErstellt == 'Ja';
+          final iconColor = maschinenblattVorhanden ? Colors.green : Colors.red;
+          final iconData = maschinenblattVorhanden ? Icons.check_circle : Icons.cancel;
+          // --- ENDE DER ÄNDERUNG ---
+
           return ListTile(
             leading: CircleAvatar(
               child: Text(g.nummer, textAlign: TextAlign.center),
@@ -58,6 +62,22 @@ class BestandslisteGruppe extends StatelessWidget {
             trailing: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
+                // --- ANFANG DER ÄNDERUNG ---
+                // Neuer IconButton, um den Status zu ändern und anzuzeigen
+                IconButton(
+                  icon: Icon(iconData, color: iconColor),
+                  tooltip: 'Maschinenblatt: ${g.maschinenblattErstellt}',
+                  onPressed: () {
+                    // Kehrt den aktuellen Wert um
+                    final neuerStatus = maschinenblattVorhanden ? 'Nein' : 'Ja';
+                    // Erstellt eine Kopie des Geräts mit dem neuen Status
+                    final geaendertesGeraet = g.copyWith(maschinenblattErstellt: neuerStatus);
+                    // Speichert die Änderung sofort
+                    onUpdate(geaendertesGeraet);
+                  },
+                ),
+                // --- ENDE DER ÄNDERUNG ---
+
                 IconButton(icon: const Icon(Icons.local_shipping, color: Colors.blueAccent), tooltip: 'Ausliefern', onPressed: () => onShowZuordnungsDialog(g)),
                 IconButton(
                   icon: const Icon(Icons.edit, color: Colors.orange),

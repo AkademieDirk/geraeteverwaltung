@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-
 import '../../models/geraet.dart';
 import '../../widgets/prozent_dropdown.dart';
 import '../../widgets/zubehoer_eingabe_zeile.dart';
@@ -81,6 +80,8 @@ class _GeraeteAufnahmeScreenState extends State<GeraeteAufnahmeScreen> {
   final _dokumenteneinzugController = TextEditingController();
   final _duplexController = TextEditingController();
   final _bemerkungController = TextEditingController();
+  // --- NEUES FELD ---
+  String _selectedMaschinenblatt = 'Nein';
 
   @override
   void initState() {
@@ -137,6 +138,8 @@ class _GeraeteAufnahmeScreenState extends State<GeraeteAufnahmeScreen> {
       _dokumenteneinzugController.text = g.dokumenteneinzug;
       _duplexController.text = g.duplex;
       _bemerkungController.text = g.bemerkung;
+      // --- NEUES FELD LADEN ---
+      _selectedMaschinenblatt = g.maschinenblattErstellt;
     } else {
       _selectedAufnahmeDatum = DateTime.now();
     }
@@ -187,7 +190,7 @@ class _GeraeteAufnahmeScreenState extends State<GeraeteAufnahmeScreen> {
     });
   }
 
-  Future<void> _importGeraete() async { /* ... unverändert ... */ }
+  Future<void> _importGeraete() async {}
 
   void _updateZaehlerGesamt() {
     setState(() {
@@ -262,6 +265,8 @@ class _GeraeteAufnahmeScreenState extends State<GeraeteAufnahmeScreen> {
       dokumenteneinzug: _dokumenteneinzugController.text.trim(),
       duplex: _duplexController.text.trim(),
       bemerkung: _bemerkungController.text.trim(),
+      // --- NEUES FELD SPEICHERN ---
+      maschinenblattErstellt: _selectedMaschinenblatt,
     );
 
     await widget.onSave(neuesGeraet);
@@ -331,8 +336,6 @@ class _GeraeteAufnahmeScreenState extends State<GeraeteAufnahmeScreen> {
           ),
         ],
       ),
-      // --- ANFANG DER ÄNDERUNG ---
-      // FloatingActionButton für einen prominenten Speichern-Button
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _saveGeraet,
         label: const Text('Speichern'),
@@ -341,14 +344,12 @@ class _GeraeteAufnahmeScreenState extends State<GeraeteAufnahmeScreen> {
         foregroundColor: Colors.white,
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
-      // --- ENDE DER ÄNDERUNG ---
 
       body: Padding(
         padding: const EdgeInsets.all(24.0),
         child: Form(
           key: _formKey,
           child: ListView(
-            // Padding unten, damit der Button den Inhalt nicht verdeckt
             padding: const EdgeInsets.only(bottom: 80),
             children: [
               if (!widget.isBestandsgeraet)
@@ -373,6 +374,10 @@ class _GeraeteAufnahmeScreenState extends State<GeraeteAufnahmeScreen> {
               const Divider(height: 32),
               DropdownButtonFormField<String>(value: _selectedModell, decoration: const InputDecoration(labelText: 'Modell*'), items: _modellOptionen.map((m) => DropdownMenuItem(value: m, child: Text(m))).toList(), onChanged: (val) => setState(() => _selectedModell = val ?? 'Nichts ausgewählt')),
               TextFormField(controller: _seriennummerController, decoration: const InputDecoration(labelText: 'Seriennummer')),
+
+              // --- NEUES AUSWAHLFELD ---
+              _buildChoiceChipRow('Maschinenblatt erstellt', _selectedMaschinenblatt, (val) => setState(() => _selectedMaschinenblatt = val)),
+
               _buildChoiceChipRow('I-Option', _selectedIOption, (val) => setState(() => _selectedIOption = val)),
               DropdownButtonFormField<String>(value: _selectedPdfTyp, decoration: const InputDecoration(labelText: 'PDF Typ'), items: _pdfTypen.map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(), onChanged: (val) => setState(() => _selectedPdfTyp = val ?? 'Nichts ausgewählt')),
               _buildChoiceChipRow('Durchsuchbar', _selectedDurchsuchbar, (val) => setState(() => _selectedDurchsuchbar = val)),
@@ -437,7 +442,6 @@ class _GeraeteAufnahmeScreenState extends State<GeraeteAufnahmeScreen> {
               ),
               const SizedBox(height: 22),
               TextFormField(controller: _bemerkungController, decoration: const InputDecoration(labelText: 'Bemerkung (frei)', alignLabelWithHint: true), minLines: 2, maxLines: 4),
-              // Der alte Button am Ende der Liste wurde entfernt
             ],
           ),
         ),

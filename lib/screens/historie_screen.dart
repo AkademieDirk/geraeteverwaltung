@@ -28,6 +28,8 @@ class HistorieScreen extends StatefulWidget {
 
 class _HistorieScreenState extends State<HistorieScreen> {
   final TextEditingController _seriennummerController = TextEditingController();
+
+  // --- KORRIGIERTE VARIABLEN ---
   List<VerbautesTeil> _aufbereitungsteile = [];
   List<Serviceeintrag> _serviceeintraege = [];
 
@@ -93,37 +95,24 @@ class _HistorieScreenState extends State<HistorieScreen> {
 
     if (zugehoerigesGeraet == null) return;
 
-    final serviceEintraege = widget.alleServiceeintraege.where((e) => e.geraeteId == zugehoerigesGeraet!.id).toList();
-    serviceEintraege.sort((a, b) => b.datum.compareTo(a.datum));
+    final serviceEintraegeGefiltert = widget.alleServiceeintraege.where((e) => e.geraeteId == zugehoerigesGeraet!.id).toList();
+    serviceEintraegeGefiltert.sort((a, b) => b.datum.compareTo(a.datum));
 
     final alleVerbautenTeile = widget.verbauteTeile[seriennummer] ?? [];
-    final inServiceVerbauteTeileIDs = serviceEintraege.expand((e) => e.verbauteTeile).map((t) => t.id).toSet();
-    final aufbereitungsteile = alleVerbautenTeile.where((t) => !inServiceVerbauteTeileIDs.contains(t.id)).toList();
-
     final teileKosten = alleVerbautenTeile.fold(0.0, (total, item) => total + item.tatsaechlicherPreis);
 
+    final inServiceVerbauteTeileIDs = serviceEintraegeGefiltert.expand((e) => e.verbauteTeile).map((t) => t.id).toSet();
+    final aufbereitungsteileGefiltert = alleVerbautenTeile.where((t) => !inServiceVerbauteTeileIDs.contains(t.id)).toList();
+
     setState(() {
-      _serviceeintraege = serviceEintraege;
-      _aufbereitungsteile = aufbereitungsteile;
+      _serviceeintraege = serviceEintraegeGefiltert;
+      _aufbereitungsteile = aufbereitungsteileGefiltert; // <-- KORRIGIERTE ZUWEISUNG
       _gesamtkosten = teileKosten;
       _angezeigteSeriennummer = seriennummer;
       _suchergebnisse = [];
       _seriennummerController.text = seriennummer;
       _gefundenesGeraet = zugehoerigesGeraet;
     });
-  }
-
-  void _loescheVerbautesTeil(VerbautesTeil teil) async {
-    final sicher = await showDialog<bool>(context: context, builder: (ctx) => AlertDialog(title: const Text('Eintrag löschen?'), content: Text('Soll der Eintrag "${teil.ersatzteil.bezeichnung}" wirklich aus der Historie gelöscht werden?'), actions: [TextButton(child: const Text('Abbrechen'), onPressed: () => Navigator.pop(ctx, false)), TextButton(child: Text('Löschen', style: TextStyle(color: Colors.red)), onPressed: () => Navigator.pop(ctx, true))]));
-    if (sicher == true && mounted) {
-      try {
-        await widget.onDelete(_angezeigteSeriennummer, teil);
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Eintrag erfolgreich gelöscht.'), backgroundColor: Colors.green));
-        _zeigeHistorieFuer(_angezeigteSeriennummer);
-      } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Fehler beim Löschen: ${e.toString()}'), backgroundColor: Colors.red));
-      }
-    }
   }
 
   void _loescheServiceeintrag(Serviceeintrag eintrag) async {
@@ -143,15 +132,33 @@ class _HistorieScreenState extends State<HistorieScreen> {
       ),
     );
     if (sicher == true) {
+      // Lösche zuerst alle Teile, die in diesem Serviceeintrag waren, aus der globalen Historie
+      for (var teil in eintrag.verbauteTeile) {
+        await widget.onDelete(_angezeigteSeriennummer, teil);
+      }
+      // Lösche dann den Serviceeintrag selbst
       await widget.onDeleteServiceeintrag(eintrag.id);
       _zeigeHistorieFuer(_angezeigteSeriennummer);
+    }
+  }
+
+  void _loescheVerbautesTeil(VerbautesTeil teil) async {
+    final sicher = await showDialog<bool>(context: context, builder: (ctx) => AlertDialog(title: const Text('Eintrag löschen?'), content: Text('Soll der Eintrag "${teil.ersatzteil.bezeichnung}" wirklich aus der Historie gelöscht werden?'), actions: [TextButton(child: const Text('Abbrechen'), onPressed: () => Navigator.pop(ctx, false)), TextButton(child: Text('Löschen', style: TextStyle(color: Colors.red)), onPressed: () => Navigator.pop(ctx, true))]));
+    if (sicher == true && mounted) {
+      try {
+        await widget.onDelete(_angezeigteSeriennummer, teil);
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Eintrag erfolgreich gelöscht.'), backgroundColor: Colors.green));
+        _zeigeHistorieFuer(_angezeigteSeriennummer);
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Fehler beim Löschen: ${e.toString()}'), backgroundColor: Colors.red));
+      }
     }
   }
 
   void _bearbeiteVerbautesTeilDialog(VerbautesTeil teil) {
     final preisController = TextEditingController(text: teil.tatsaechlicherPreis.toStringAsFixed(2));
     final bemerkungController = TextEditingController(text: teil.bemerkung);
-    showDialog(context: context, builder: (context) => AlertDialog(title: Text('Eintrag bearbeiten'), content: Column(mainAxisSize: MainAxisSize.min, children: [Text(teil.ersatzteil.bezeichnung, style: TextStyle(fontWeight: FontWeight.bold)), SizedBox(height: 16), TextField(controller: preisController, decoration: InputDecoration(labelText: 'Tatsächlicher Preis', border: OutlineInputBorder(), suffixText: '€'), keyboardType: TextInputType.numberWithOptions(decimal: true)), SizedBox(height: 16), TextField(controller: bemerkungController, decoration: InputDecoration(labelText: 'Bemerkung (z.B. Abweichung)', border: OutlineInputBorder()), maxLines: 2)]), actions: [TextButton(onPressed: () => Navigator.pop(context), child: Text('Abbrechen')), ElevatedButton(onPressed: () async { final neuerPreis = double.tryParse(preisController.text.replaceAll(',', '.')) ?? teil.tatsaechlicherPreis; final geandertesTeil = VerbautesTeil(id: teil.id, ersatzteil: teil.ersatzteil, installationsDatum: teil.installationsDatum, tatsaechlicherPreis: neuerPreis, bemerkung: bemerkungController.text.trim(), herkunftslager: teil.herkunftslager); await widget.onUpdate(_angezeigteSeriennummer, geandertesTeil); Navigator.pop(context); _zeigeHistorieFuer(_angezeigteSeriennummer); }, child: Text('Speichern'))]));
+    showDialog(context: context, builder: (context) => AlertDialog(title: Text('Eintrag bearbeiten'), content: Column(mainAxisSize: MainAxisSize.min, children: [Text(teil.ersatzteil.bezeichnung, style: TextStyle(fontWeight: FontWeight.bold)), SizedBox(height: 16), TextField(controller: preisController, decoration: InputDecoration(labelText: 'Tatsächlicher Preis', border: OutlineInputBorder(), suffixText: '€'), keyboardType: TextInputType.numberWithOptions(decimal: true)), SizedBox(height: 16), TextField(controller: bemerkungController, decoration: InputDecoration(labelText: 'Bemerkung (z.B. Abweichung)', border: OutlineInputBorder()), maxLines: 2)]), actions: [TextButton(onPressed: () => Navigator.pop(context), child: Text('Abbrechen')), ElevatedButton(onPressed: () async { final neuerPreis = double.tryParse(preisController.text.replaceAll(',', '.')) ?? teil.tatsaechlicherPreis; final geandertesTeil = VerbautesTeil(id: teil.id, ersatzteil: teil.ersatzteil, installationsDatum: teil.installationsDatum, tatsaechlicherPreis: neuerPreis, bemerkung: bemerkungController.text.trim(), herkunftslager: teil.herkunftslager, menge: teil.menge); await widget.onUpdate(_angezeigteSeriennummer, geandertesTeil); Navigator.pop(context); _zeigeHistorieFuer(_angezeigteSeriennummer); }, child: Text('Speichern'))]));
   }
 
   @override
@@ -246,18 +253,15 @@ class _HistorieScreenState extends State<HistorieScreen> {
         Expanded(
           child: ListView(
             children: [
-              // --- ANFANG DER ÄNDERUNG ---
               if (_aufbereitungsteile.isNotEmpty)
                 Card(
                   child: ExpansionTile(
                     leading: const Icon(Icons.inventory_2, color: Colors.blueGrey),
-                    // 1. Text geändert
                     title: Text('Teile verbaut (${_aufbereitungsteile.length})', style: const TextStyle(fontWeight: FontWeight.bold)),
                     children: _aufbereitungsteile.map((teil) {
-                      // 2. ListTile durch ExpansionTile ersetzt, um Buttons anzuzeigen
                       return ExpansionTile(
-                        leading: const SizedBox(width: 24), // Einrücken für bessere Optik
-                        title: Text(teil.ersatzteil.bezeichnung),
+                        leading: const SizedBox(width: 24),
+                        title: Text('${teil.menge}x ${teil.ersatzteil.bezeichnung}'),
                         subtitle: Text('Eingebaut am: ${DateFormat('dd.MM.yyyy').format(teil.installationsDatum)}'),
                         trailing: Text('${teil.tatsaechlicherPreis.toStringAsFixed(2)} €'),
                         children: [
@@ -283,7 +287,6 @@ class _HistorieScreenState extends State<HistorieScreen> {
                     }).toList(),
                   ),
                 ),
-              // --- ENDE DER ÄNDERUNG ---
 
               if (_serviceeintraege.isNotEmpty)
                 ..._serviceeintraege.map((eintrag) {
@@ -312,7 +315,7 @@ class _HistorieScreenState extends State<HistorieScreen> {
                                   return ListTile(
                                     dense: true,
                                     leading: const Icon(Icons.settings, size: 18),
-                                    title: Text(teil.ersatzteil.bezeichnung),
+                                    title: Text('${teil.menge}x ${teil.ersatzteil.bezeichnung}'),
                                     trailing: Text('${teil.tatsaechlicherPreis.toStringAsFixed(2)} €'),
                                   );
                                 }).toList()

@@ -1,65 +1,130 @@
 // lib/router/app_router.dart
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:projekte/screens/kunden/kunden_screen.dart';
 
-// === Deine echten Screens (bitte anpassen, falls Namen/Pfade anders sind) ===
-import '../screens/bestandsliste_screen.dart';
-import '../screens/geraeteaufnahme/geraeteaufnahme_screen.dart';
-import '../screens/kunden_screen.dart';
+// Diese beiden Widgets kommen aus deinem Projekt.
+// Falls deine Pfade/Klassen anders heißen, bitte hier anpassen:
+import '../screens/login_screen.dart';
+import '../main.dart' show MyHomePage, AuthGate;
 
-/// Zentraler GoRouter für deine Web-App.
-/// Vorteile: saubere URLs, Back-Button im Browser, Deep Links.
+/// Gemeinsames Layout für eingeloggte Bereiche.
+/// Entfernt "home" aus der Breadcrumb-Anzeige.
+/// Auf exakt "/home" wird die AppBar GAR NICHT angezeigt (mehr Platz).
+class AppScaffold extends StatelessWidget {
+  final GoRouterState state;
+  final Widget child;
+
+  const AppScaffold({
+    super.key,
+    required this.state,
+    required this.child,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final segments = state.uri.pathSegments; // z. B. ["geraete","123"]
+
+    // 1) Für "/home" KEINE AppBar anzeigen
+    final isExactlyHome = segments.length == 1 && segments.first == 'home';
+    if (isExactlyHome) {
+      return Scaffold(body: child);
+    }
+
+    // 2) Breadcrumbs bauen – Segment "home" vollständig ausblenden
+    final filtered = segments.where((s) => s != 'home' && s.isNotEmpty).toList();
+    final List<Widget> crumbs = <Widget>[];
+
+    if (filtered.isNotEmpty) {
+      String acc = '';
+      for (int i = 0; i < filtered.length; i++) {
+        final seg = filtered[i];
+        acc += '/$seg';
+        final last = i == filtered.length - 1;
+        final label = _format(seg);
+        crumbs.add(
+          last
+              ? Text(label, style: const TextStyle(fontWeight: FontWeight.bold))
+              : InkWell(onTap: () => context.go(acc), child: Text(label)),
+        );
+        if (!last) crumbs.add(const Text(' / '));
+      }
+    }
+
+    return Scaffold(
+      appBar: filtered.isEmpty
+          ? null // falls nichts übrig ist, keine AppBar zeigen
+          : AppBar(title: Wrap(children: crumbs)),
+      body: child,
+    );
+  }
+
+  // Helper: Zahlen (IDs) unverändert, Text mit großem Anfangsbuchstaben
+  static String _format(String seg) {
+    if (int.tryParse(seg) != null) return seg;
+    return seg.isEmpty ? seg : '${seg[0].toUpperCase()}${seg.substring(1)}';
+  }
+}
+
+/// GoRouter-Konfiguration:
+/// - "/" und "/login" liegen VOR der Shell (ohne Breadcrumbs)
+/// - alles andere in der Shell (Breadcrumbs ohne "home")
 final GoRouter appRouter = GoRouter(
-  // Auf welche URL die App beim Start geht:
-  initialLocation: '/geraete',
-
+  initialLocation: '/', // AuthGate entscheidet, wohin umgeleitet wird
   routes: [
-    // Start/Redirect auf Geräteübersicht (optional zusätzlich zur initialLocation)
+    // Root beobachtet den Auth-Status (dein AuthGate)
     GoRoute(
-      name: 'home',
       path: '/',
-      redirect: (context, state) => '/geraete',
+      name: 'root',
+      builder: (context, state) => const AuthGate(),
     ),
 
-    // Geräte-Liste
+    // Login separat – ohne Breadcrumbs
     GoRoute(
-      name: 'geraete_liste',
-      path: '/geraete',
-      builder: (context, state) => BestandslisteScreen(
-        // Falls dein Screen Parameter braucht, hier einsetzen
-        // z. B. Filter aus Query: state.uri.queryParameters['modell']
-      ),
+      path: '/login',
+      name: 'login',
+      builder: (context, state) => const LoginScreen(),
+    ),
+
+    // Shell: gemeinsames Layout + Breadcrumbs (ohne "home")
+    ShellRoute(
+      builder: (context, state, child) => AppScaffold(state: state, child: child),
       routes: [
-        // Neues Gerät anlegen
+        // Startseite nach Login – zeigt KEINE AppBar (siehe AppScaffold)
         GoRoute(
-          name: 'geraet_neu',
-          path: 'neu',
-          builder: (context, state) => GeraeteAufnahmeScreen(
-            // Modus "neu" – passe Props an deinen Konstruktor an
-            // z. B. existingId: null
-          ),
+          path: '/home',
+          name: 'home',
+          builder: (context, state) => const MyHomePage(),
         ),
-        // Gerät bearbeiten/Details per ID: /geraete/123
+
+        // Beispiel: Geräte (du kannst hier später echte List/Detail-Screens verdrahten)
         GoRoute(
-          name: 'geraet_detail',
-          path: ':id',
-          builder: (context, state) {
-            final String id = state.pathParameters['id']!;
-            return GeraeteAufnahmeScreen(
-              // Modus "bearbeiten" – reiche die ID weiter
-              // z. B. existingId: id
-            );
-          },
+          path: '/geraete',
+          name: 'geraete',
+          builder: (context, state) => const MyHomePage(),
+          routes: [
+            GoRoute(
+              path: 'neu', // /geraete/neu
+              name: 'geraete_neu',
+              builder: (context, state) => const MyHomePage(),
+            ),
+            GoRoute(
+              path: ':id', // /geraete/123
+              name: 'geraete_detail',
+              builder: (context, state) {
+                final _ = state.pathParameters['id']!;
+                return const MyHomePage();
+              },
+            ),
+          ],
+        ),
+
+        // Beispiel: Kunden
+        GoRoute(
+          path: '/kunden',
+          name: 'kunden',
+          builder: (context, state) => const MyHomePage(),
         ),
       ],
-    ),
-
-    // Kunden-Ansicht
-    GoRoute(
-      name: 'kunden',
-      path: '/kunden',
-      builder: (context, state) => const KundenScreen(),
     ),
   ],
 );

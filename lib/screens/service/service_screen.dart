@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import '../../models/geraet.dart';
-import '../../models/ersatzteil.dart';
-import '../../models/serviceeintrag.dart';
+import '/models/geraet.dart';
+import '/models/ersatzteil.dart';
+import '/models/serviceeintrag.dart';
 import 'serviceeintrag_screen.dart';
 
 class ServiceScreen extends StatefulWidget {
@@ -13,7 +13,7 @@ class ServiceScreen extends StatefulWidget {
   final Future<void> Function(Serviceeintrag) onUpdateServiceeintrag;
   final Future<void> Function(String) onDeleteServiceeintrag;
   // --- KORRIGIERTE SIGNATUR ---
-  final Future<void> Function(String, Ersatzteil, String) onTeilVerbauen;
+  final Future<void> Function(String, Ersatzteil, String, int) onTeilVerbauen;
 
   const ServiceScreen({
     Key? key,
@@ -206,7 +206,7 @@ class _ServiceScreenState extends State<ServiceScreen> {
                             if (eintrag.verbauteTeile.isNotEmpty) ...[
                               const Divider(height: 24),
                               const Text('Bei diesem Service verbaute Teile:', style: TextStyle(fontWeight: FontWeight.bold)),
-                              ...eintrag.verbauteTeile.map((teil) => Text('- ${teil.ersatzteil.bezeichnung} (ArtNr: ${teil.ersatzteil.artikelnummer})')),
+                              ...eintrag.verbauteTeile.map((teil) => Text('- ${teil.menge}x ${teil.ersatzteil.bezeichnung} (ArtNr: ${teil.ersatzteil.artikelnummer})')),
                             ]
                           ],
                         ),
