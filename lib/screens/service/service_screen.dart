@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import '/models/geraet.dart';
-import '/models/ersatzteil.dart';
-import '/models/serviceeintrag.dart';
-import 'serviceeintrag_screen.dart';
+import 'package:url_launcher/url_launcher.dart'; // <-- WICHTIGER IMPORT
+import 'package:projekte/models/geraet.dart';
+import 'package:projekte/models/ersatzteil.dart';
+import 'package:projekte/models/serviceeintrag.dart';
+import 'package:projekte/screens/service/serviceeintrag_screen.dart';
 
 class ServiceScreen extends StatefulWidget {
   final List<Geraet> alleGeraete;
@@ -12,7 +13,6 @@ class ServiceScreen extends StatefulWidget {
   final Future<void> Function(Serviceeintrag) onAddServiceeintrag;
   final Future<void> Function(Serviceeintrag) onUpdateServiceeintrag;
   final Future<void> Function(String) onDeleteServiceeintrag;
-  // --- KORRIGIERTE SIGNATUR ---
   final Future<void> Function(String, Ersatzteil, String, int) onTeilVerbauen;
 
   const ServiceScreen({
@@ -40,6 +40,20 @@ class _ServiceScreenState extends State<ServiceScreen> {
     _searchController.dispose();
     super.dispose();
   }
+
+  // --- ANFANG DER KORREKTUR ---
+  Future<void> _launchURL(String urlString) async {
+    final Uri url = Uri.parse(urlString);
+    // Dieser Modus ist für Web am zuverlässigsten, um einen neuen Tab zu öffnen.
+    if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
+      if(mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Konnte den Link nicht öffnen: $urlString'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+  // --- ENDE DER KORREKTUR ---
 
   void _deleteServiceeintrag(Serviceeintrag eintrag) async {
     final sicher = await showDialog<bool>(
@@ -207,6 +221,18 @@ class _ServiceScreenState extends State<ServiceScreen> {
                               const Divider(height: 24),
                               const Text('Bei diesem Service verbaute Teile:', style: TextStyle(fontWeight: FontWeight.bold)),
                               ...eintrag.verbauteTeile.map((teil) => Text('- ${teil.menge}x ${teil.ersatzteil.bezeichnung} (ArtNr: ${teil.ersatzteil.artikelnummer})')),
+                            ],
+                            if (eintrag.anhaenge.isNotEmpty) ...[
+                              const Divider(height: 24),
+                              const Text('Anhänge:', style: TextStyle(fontWeight: FontWeight.bold)),
+                              ...eintrag.anhaenge.map((anhang) {
+                                return ListTile(
+                                  leading: const Icon(Icons.attach_file, color: Colors.blue),
+                                  title: Text(anhang['name']!, style: const TextStyle(decoration: TextDecoration.underline, color: Colors.blue)),
+                                  dense: true,
+                                  onTap: () => _launchURL(anhang['url']!),
+                                );
+                              })
                             ]
                           ],
                         ),

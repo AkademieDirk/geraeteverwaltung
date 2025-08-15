@@ -28,8 +28,6 @@ class HistorieScreen extends StatefulWidget {
 
 class _HistorieScreenState extends State<HistorieScreen> {
   final TextEditingController _seriennummerController = TextEditingController();
-
-  // --- KORRIGIERTE VARIABLEN ---
   List<VerbautesTeil> _aufbereitungsteile = [];
   List<Serviceeintrag> _serviceeintraege = [];
 
@@ -99,14 +97,14 @@ class _HistorieScreenState extends State<HistorieScreen> {
     serviceEintraegeGefiltert.sort((a, b) => b.datum.compareTo(a.datum));
 
     final alleVerbautenTeile = widget.verbauteTeile[seriennummer] ?? [];
-    final teileKosten = alleVerbautenTeile.fold(0.0, (total, item) => total + item.tatsaechlicherPreis);
+    final teileKosten = alleVerbautenTeile.fold(0.0, (total, item) => total + (item.tatsaechlicherPreis));
 
     final inServiceVerbauteTeileIDs = serviceEintraegeGefiltert.expand((e) => e.verbauteTeile).map((t) => t.id).toSet();
     final aufbereitungsteileGefiltert = alleVerbautenTeile.where((t) => !inServiceVerbauteTeileIDs.contains(t.id)).toList();
 
     setState(() {
       _serviceeintraege = serviceEintraegeGefiltert;
-      _aufbereitungsteile = aufbereitungsteileGefiltert; // <-- KORRIGIERTE ZUWEISUNG
+      _aufbereitungsteile = aufbereitungsteileGefiltert;
       _gesamtkosten = teileKosten;
       _angezeigteSeriennummer = seriennummer;
       _suchergebnisse = [];
@@ -132,11 +130,9 @@ class _HistorieScreenState extends State<HistorieScreen> {
       ),
     );
     if (sicher == true) {
-      // Lösche zuerst alle Teile, die in diesem Serviceeintrag waren, aus der globalen Historie
       for (var teil in eintrag.verbauteTeile) {
         await widget.onDelete(_angezeigteSeriennummer, teil);
       }
-      // Lösche dann den Serviceeintrag selbst
       await widget.onDeleteServiceeintrag(eintrag.id);
       _zeigeHistorieFuer(_angezeigteSeriennummer);
     }
@@ -156,9 +152,26 @@ class _HistorieScreenState extends State<HistorieScreen> {
   }
 
   void _bearbeiteVerbautesTeilDialog(VerbautesTeil teil) {
-    final preisController = TextEditingController(text: teil.tatsaechlicherPreis.toStringAsFixed(2));
+    final preisController = TextEditingController(text: (teil.tatsaechlicherPreis / teil.menge).toStringAsFixed(2));
+    final mengeController = TextEditingController(text: teil.menge.toString());
     final bemerkungController = TextEditingController(text: teil.bemerkung);
-    showDialog(context: context, builder: (context) => AlertDialog(title: Text('Eintrag bearbeiten'), content: Column(mainAxisSize: MainAxisSize.min, children: [Text(teil.ersatzteil.bezeichnung, style: TextStyle(fontWeight: FontWeight.bold)), SizedBox(height: 16), TextField(controller: preisController, decoration: InputDecoration(labelText: 'Tatsächlicher Preis', border: OutlineInputBorder(), suffixText: '€'), keyboardType: TextInputType.numberWithOptions(decimal: true)), SizedBox(height: 16), TextField(controller: bemerkungController, decoration: InputDecoration(labelText: 'Bemerkung (z.B. Abweichung)', border: OutlineInputBorder()), maxLines: 2)]), actions: [TextButton(onPressed: () => Navigator.pop(context), child: Text('Abbrechen')), ElevatedButton(onPressed: () async { final neuerPreis = double.tryParse(preisController.text.replaceAll(',', '.')) ?? teil.tatsaechlicherPreis; final geandertesTeil = VerbautesTeil(id: teil.id, ersatzteil: teil.ersatzteil, installationsDatum: teil.installationsDatum, tatsaechlicherPreis: neuerPreis, bemerkung: bemerkungController.text.trim(), herkunftslager: teil.herkunftslager, menge: teil.menge); await widget.onUpdate(_angezeigteSeriennummer, geandertesTeil); Navigator.pop(context); _zeigeHistorieFuer(_angezeigteSeriennummer); }, child: Text('Speichern'))]));
+
+    showDialog(context: context, builder: (context) => AlertDialog(title: Text('Eintrag bearbeiten'), content: Column(mainAxisSize: MainAxisSize.min, children: [
+      Text(teil.ersatzteil.bezeichnung, style: TextStyle(fontWeight: FontWeight.bold)),
+      SizedBox(height: 16),
+      TextField(controller: preisController, decoration: InputDecoration(labelText: 'Preis pro Stück', border: OutlineInputBorder(), suffixText: '€'), keyboardType: TextInputType.numberWithOptions(decimal: true)),
+      SizedBox(height: 16),
+      TextField(controller: mengeController, decoration: InputDecoration(labelText: 'Menge', border: OutlineInputBorder()), keyboardType: TextInputType.number),
+      SizedBox(height: 16),
+      TextField(controller: bemerkungController, decoration: InputDecoration(labelText: 'Bemerkung', border: OutlineInputBorder()), maxLines: 2)
+    ]), actions: [TextButton(onPressed: () => Navigator.pop(context), child: Text('Abbrechen')), ElevatedButton(onPressed: () async {
+      final neuerPreisProStueck = double.tryParse(preisController.text.replaceAll(',', '.')) ?? (teil.tatsaechlicherPreis / teil.menge);
+      final neueMenge = int.tryParse(mengeController.text) ?? teil.menge;
+      final geandertesTeil = VerbautesTeil(id: teil.id, ersatzteil: teil.ersatzteil, installationsDatum: teil.installationsDatum, tatsaechlicherPreis: neuerPreisProStueck * neueMenge, bemerkung: bemerkungController.text.trim(), herkunftslager: teil.herkunftslager, menge: neueMenge);
+      await widget.onUpdate(_angezeigteSeriennummer, geandertesTeil);
+      Navigator.pop(context);
+      _zeigeHistorieFuer(_angezeigteSeriennummer);
+    }, child: Text('Speichern'))]));
   }
 
   @override

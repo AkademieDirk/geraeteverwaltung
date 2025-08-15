@@ -1,16 +1,18 @@
 import 'package:flutter/material.dart';
-import '../models/geraet.dart';
-import '../models/ersatzteil.dart';
-import '../models/verbautes_teil.dart';
-import '../models/serviceeintrag.dart';
-import 'historie_screen.dart';
+// --- ANFANG DER KORREKTUR ---
+// Alle Import-Pfade wurden auf den absoluten 'package:'-Stil umgestellt.
+import 'package:projekte/models/geraet.dart';
+import 'package:projekte/models/ersatzteil.dart';
+import 'package:projekte/models/verbautes_teil.dart';
+import 'package:projekte/models/serviceeintrag.dart';
+import 'package:projekte/screens/historie_screen.dart';
+// --- ENDE DER KORREKTUR ---
 
 class AufbereitungScreen extends StatefulWidget {
   final List<Geraet> alleGeraete;
   final List<Ersatzteil> alleErsatzteile;
   final Map<String, List<VerbautesTeil>> verbauteTeile;
   final List<Serviceeintrag> alleServiceeintraege;
-  // --- KORRIGIERTE SIGNATUR ---
   final Future<void> Function(String, Ersatzteil, String, int) onTeilVerbauen;
   final Future<void> Function(String, VerbautesTeil) onDeleteVerbautesTeil;
   final Future<void> Function(String, VerbautesTeil) onUpdateVerbautesTeil;
@@ -89,7 +91,6 @@ class _AufbereitungScreenState extends State<AufbereitungScreen> {
     }
   }
 
-  // --- LOGIK ZUM VERBAUEN ANGEPASST ---
   void _verbaueTeil() async {
     if (_gefundenesGeraet == null || _foundArticle == null || _selectedLager == null) {
       _showSnackbar(context, 'Bitte zuerst Gerät, Lager und Ersatzteil auswählen.');
@@ -118,7 +119,6 @@ class _AufbereitungScreenState extends State<AufbereitungScreen> {
     }
   }
 
-  // --- NEUER DIALOG FÜR MENGENEINGABE ---
   Future<int?> _showMengenEingabeDialog(int maxMenge) {
     final controller = TextEditingController(text: '1');
     return showDialog<int>(

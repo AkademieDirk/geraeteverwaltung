@@ -1,18 +1,21 @@
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:uuid/uuid.dart';
-import '/models/geraet.dart';
-import '/models/ersatzteil.dart';
-import '/models/verbautes_teil.dart';
-import '/models/serviceeintrag.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:projekte/models/geraet.dart';
+import 'package:projekte/models/ersatzteil.dart';
+import 'package:projekte/models/verbautes_teil.dart';
+import 'package:projekte/models/serviceeintrag.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class ServiceeintragScreen extends StatefulWidget {
   final Geraet geraet;
   final Serviceeintrag? initialEintrag;
   final List<Ersatzteil> alleErsatzteile;
   final Future<void> Function(Serviceeintrag) onSave;
-  // --- KORRIGIERTE SIGNATUR ---
   final Future<void> Function(String, Ersatzteil, String, int) onTeilVerbauen;
 
   const ServiceeintragScreen({
@@ -36,8 +39,12 @@ class _ServiceeintragScreenState extends State<ServiceeintragScreen> {
   String _selectedMitarbeiter = 'Nichts ausgewählt';
   DateTime _selectedDatum = DateTime.now();
 
-  final List<VerbautesTeil> _verbauteTeile = [];
+  // --- KORRIGIERTE INITIALISIERUNG ---
+  List<VerbautesTeil> _verbauteTeile = [];
+  List<Map<String, String>> _anhaenge = [];
+
   final Uuid _uuid = const Uuid();
+  bool _isUploading = false;
 
   bool get isEditMode => widget.initialEintrag != null;
 
@@ -51,9 +58,8 @@ class _ServiceeintragScreenState extends State<ServiceeintragScreen> {
           ? eintrag.verantwortlicherMitarbeiter
           : 'Nichts ausgewählt';
       _selectedDatum = eintrag.datum.toDate();
-      setState(() {
-        _verbauteTeile.addAll(eintrag.verbauteTeile);
-      });
+      _verbauteTeile = List.from(eintrag.verbauteTeile);
+      _anhaenge = List.from(eintrag.anhaenge);
     }
   }
 
@@ -62,6 +68,64 @@ class _ServiceeintragScreenState extends State<ServiceeintragScreen> {
     _arbeitenController.dispose();
     super.dispose();
   }
+
+  // --- ANFANG DER NEUEN, ROBUSTEN UPLOAD-FUNKTION (DEIN VORSCHLAG) ---
+  Future<void> _pickAndUploadFile() async {
+    if (!mounted) return;
+    setState(() => _isUploading = true);
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        withData: true, // <- WICHTIG: sorgt dafür, dass .bytes befüllt ist
+        type: FileType.custom,
+        allowedExtensions: ['pdf', 'jpg', 'jpeg', 'png'],
+      );
+
+      if (result == null) {
+        if (mounted) setState(() => _isUploading = false);
+        return; // User hat den Dialog abgebrochen
+      }
+
+      final platformFile = result.files.single;
+      final Uint8List? fileBytes = platformFile.bytes;
+
+      if (fileBytes == null) {
+        throw StateError('Keine Datei-Bytes verfügbar. Der Upload wurde abgebrochen.');
+      }
+
+      final String fileName = platformFile.name;
+      final String deviceId = widget.geraet.id.isNotEmpty ? widget.geraet.id : _uuid.v4();
+
+      final storagePath = 'service_anhaenge/$deviceId/${_uuid.v4()}-$fileName';
+      final storageRef = FirebaseStorage.instance.ref(storagePath);
+
+      String? contentType;
+      final lowerFileName = fileName.toLowerCase();
+      if (lowerFileName.endsWith('.pdf')) contentType = 'application/pdf';
+      if (lowerFileName.endsWith('.jpg') || lowerFileName.endsWith('.jpeg')) contentType = 'image/jpeg';
+      if (lowerFileName.endsWith('.png')) contentType = 'image/png';
+
+      await storageRef.putData(
+        fileBytes,
+        contentType != null ? SettableMetadata(contentType: contentType) : null,
+      );
+      final downloadUrl = await storageRef.getDownloadURL();
+
+      if (!mounted) return;
+      setState(() {
+        _anhaenge.add({'name': fileName, 'url': downloadUrl});
+      });
+
+    } catch (e) {
+      if (!mounted) return;
+      debugPrint('Upload-Fehler: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Fehler beim Upload: $e'), backgroundColor: Colors.red),
+      );
+    } finally {
+      if (mounted) setState(() => _isUploading = false);
+    }
+  }
+  // --- ENDE DER NEUEN, ROBUSTEN UPLOAD-FUNKTION ---
 
   void _saveEintrag() async {
     if (_formKey.currentState!.validate()) {
@@ -77,10 +141,11 @@ class _ServiceeintragScreenState extends State<ServiceeintragScreen> {
         datum: Timestamp.fromDate(_selectedDatum),
         ausgefuehrteArbeiten: _arbeitenController.text.trim(),
         verbauteTeile: _verbauteTeile,
+        anhaenge: _anhaenge,
       );
 
       await widget.onSave(neuerEintrag);
-      Navigator.of(context).pop();
+      if (mounted) Navigator.of(context).pop();
     }
   }
 
@@ -110,7 +175,7 @@ class _ServiceeintragScreenState extends State<ServiceeintragScreen> {
       context: context,
       builder: (ctx) {
         return AlertDialog(
-          title: const Text('Ersatzteil auswählen'),
+          title: const Text('Ersatzteil verbauen'),
           content: SizedBox(
             width: 500,
             height: 600,
@@ -128,7 +193,6 @@ class _ServiceeintragScreenState extends State<ServiceeintragScreen> {
                         title: Text(teil.bezeichnung),
                         subtitle: Text('ArtNr: ${teil.artikelnummer} | Preis: ${teil.preis}€'),
                         onTap: () async {
-                          // Schließe den Teiledialog, bevor die nächsten Dialoge öffnen
                           Navigator.of(ctx).pop();
                           final lager = await _showLagerAuswahlDialog(teil);
                           if (lager != null) {
@@ -150,9 +214,9 @@ class _ServiceeintragScreenState extends State<ServiceeintragScreen> {
                                   _verbauteTeile.add(verbautesTeil);
                                 });
 
-                                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$menge x ${teil.bezeichnung} wurde(n) hinzugefügt.'), backgroundColor: Colors.green));
+                                if(mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$menge x ${teil.bezeichnung} wurde(n) hinzugefügt.'), backgroundColor: Colors.green));
                               } catch (e) {
-                                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Fehler: ${e.toString()}'), backgroundColor: Colors.red));
+                                if(mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Fehler: ${e.toString()}'), backgroundColor: Colors.red));
                               }
                             }
                           }
@@ -199,7 +263,6 @@ class _ServiceeintragScreenState extends State<ServiceeintragScreen> {
     );
   }
 
-  // --- NEUER DIALOG ZUR MENGENEINGABE ---
   Future<int?> _showMengenEingabeDialog(int maxMenge) {
     final controller = TextEditingController(text: '1');
     return showDialog<int>(
@@ -302,6 +365,47 @@ class _ServiceeintragScreenState extends State<ServiceeintragScreen> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
+                  Text('Anhänge', style: Theme.of(context).textTheme.titleLarge),
+                  ElevatedButton.icon(
+                    icon: _isUploading
+                        ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.0))
+                        : const Icon(Icons.attach_file),
+                    label: const Text('Hochladen'),
+                    onPressed: _isUploading ? null : _pickAndUploadFile,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              _anhaenge.isEmpty
+                  ? const Text('Noch keine Anhänge für diesen Eintrag hochgeladen.')
+                  : ListView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: _anhaenge.length,
+                itemBuilder: (ctx, index) {
+                  final anhang = _anhaenge[index];
+                  return Card(
+                    child: ListTile(
+                      leading: const Icon(Icons.picture_as_pdf, color: Colors.red),
+                      title: Text(anhang['name']!, overflow: TextOverflow.ellipsis),
+                      trailing: IconButton(
+                        icon: const Icon(Icons.remove_circle, color: Colors.red),
+                        onPressed: () {
+                          setState(() {
+                            _anhaenge.removeAt(index);
+                          });
+                        },
+                      ),
+                    ),
+                  );
+                },
+              ),
+
+              const Divider(height: 40),
+
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
                   Text('Verbaute Teile', style: Theme.of(context).textTheme.titleLarge),
                   ElevatedButton.icon(
                     icon: const Icon(Icons.add),
@@ -322,7 +426,6 @@ class _ServiceeintragScreenState extends State<ServiceeintragScreen> {
                   return Card(
                     child: ListTile(
                       leading: const Icon(Icons.settings),
-                      // Zeigt jetzt die Menge an
                       title: Text('${teil.menge}x ${teil.ersatzteil.bezeichnung}'),
                       subtitle: Text('ArtNr: ${teil.ersatzteil.artikelnummer}'),
                       trailing: IconButton(

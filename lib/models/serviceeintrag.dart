@@ -1,5 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'verbautes_teil.dart'; // <-- Wichtiger Import
+import 'verbautes_teil.dart';
 
 class Serviceeintrag {
   final String id;
@@ -7,8 +7,9 @@ class Serviceeintrag {
   final String verantwortlicherMitarbeiter;
   final Timestamp datum;
   final String ausgefuehrteArbeiten;
-  // --- WIEDER HINZUGEFÜGT ---
   final List<VerbautesTeil> verbauteTeile;
+  // --- NEUES FELD ---
+  final List<Map<String, String>> anhaenge; // Speichert eine Liste von Maps mit Name und URL
 
   Serviceeintrag({
     required this.id,
@@ -16,8 +17,8 @@ class Serviceeintrag {
     required this.verantwortlicherMitarbeiter,
     required this.datum,
     required this.ausgefuehrteArbeiten,
-    // --- WIEDER HINZUGEFÜGT ---
     this.verbauteTeile = const [],
+    this.anhaenge = const [], // --- NEU ---
   });
 
   Map<String, dynamic> toJson() {
@@ -26,14 +27,13 @@ class Serviceeintrag {
       'verantwortlicherMitarbeiter': verantwortlicherMitarbeiter,
       'datum': datum,
       'ausgefuehrteArbeiten': ausgefuehrteArbeiten,
-      // --- WIEDER HINZUGEFÜGT ---
       'verbauteTeile': verbauteTeile.map((teil) => teil.toJson()).toList(),
+      'anhaenge': anhaenge, // --- NEU ---
     };
   }
 
   factory Serviceeintrag.fromFirestore(DocumentSnapshot<Map<String, dynamic>> doc) {
     final data = doc.data() ?? {};
-    // --- WIEDER HINZUGEFÜGT ---
     final teileData = data['verbauteTeile'] as List<dynamic>? ?? [];
 
     return Serviceeintrag(
@@ -42,8 +42,13 @@ class Serviceeintrag {
       verantwortlicherMitarbeiter: data['verantwortlicherMitarbeiter'] ?? '',
       datum: data['datum'] ?? Timestamp.now(),
       ausgefuehrteArbeiten: data['ausgefuehrteArbeiten'] ?? '',
-      // --- WIEDER HINZUGEFÜGT ---
       verbauteTeile: teileData.map((data) => VerbautesTeil.fromMap(data)).toList(),
+      // --- NEU: Konvertiert die Firestore-Daten sicher in unsere Map-Liste ---
+      anhaenge: List<Map<String, String>>.from(
+        (data['anhaenge'] as List<dynamic>? ?? []).map(
+              (item) => Map<String, String>.from(item as Map),
+        ),
+      ),
     );
   }
 }
