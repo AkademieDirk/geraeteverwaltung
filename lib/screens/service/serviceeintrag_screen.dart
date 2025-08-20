@@ -40,6 +40,7 @@ class _ServiceeintragScreenState extends State<ServiceeintragScreen> {
   DateTime _selectedDatum = DateTime.now();
 
   // --- KORRIGIERTE INITIALISIERUNG ---
+  // Die Listen werden jetzt sofort als leere Listen deklariert.
   List<VerbautesTeil> _verbauteTeile = [];
   List<Map<String, String>> _anhaenge = [];
 
@@ -69,27 +70,26 @@ class _ServiceeintragScreenState extends State<ServiceeintragScreen> {
     super.dispose();
   }
 
-  // --- ANFANG DER NEUEN, ROBUSTEN UPLOAD-FUNKTION (DEIN VORSCHLAG) ---
   Future<void> _pickAndUploadFile() async {
     if (!mounted) return;
     setState(() => _isUploading = true);
     try {
       final result = await FilePicker.platform.pickFiles(
-        withData: true, // <- WICHTIG: sorgt dafür, dass .bytes befüllt ist
+        withData: true,
         type: FileType.custom,
         allowedExtensions: ['pdf', 'jpg', 'jpeg', 'png'],
       );
 
       if (result == null) {
         if (mounted) setState(() => _isUploading = false);
-        return; // User hat den Dialog abgebrochen
+        return;
       }
 
       final platformFile = result.files.single;
       final Uint8List? fileBytes = platformFile.bytes;
 
       if (fileBytes == null) {
-        throw StateError('Keine Datei-Bytes verfügbar. Der Upload wurde abgebrochen.');
+        throw StateError('Keine Datei-Bytes verfügbar.');
       }
 
       final String fileName = platformFile.name;
@@ -125,7 +125,17 @@ class _ServiceeintragScreenState extends State<ServiceeintragScreen> {
       if (mounted) setState(() => _isUploading = false);
     }
   }
-  // --- ENDE DER NEUEN, ROBUSTEN UPLOAD-FUNKTION ---
+
+  Future<void> _launchURL(String urlString) async {
+    final Uri url = Uri.parse(urlString);
+    if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
+      if(mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Konnte den Link nicht öffnen: $urlString'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
 
   void _saveEintrag() async {
     if (_formKey.currentState!.validate()) {
@@ -145,7 +155,7 @@ class _ServiceeintragScreenState extends State<ServiceeintragScreen> {
       );
 
       await widget.onSave(neuerEintrag);
-      if (mounted) Navigator.of(context).pop();
+      if(mounted) Navigator.of(context).pop();
     }
   }
 
@@ -386,8 +396,9 @@ class _ServiceeintragScreenState extends State<ServiceeintragScreen> {
                   final anhang = _anhaenge[index];
                   return Card(
                     child: ListTile(
-                      leading: const Icon(Icons.picture_as_pdf, color: Colors.red),
-                      title: Text(anhang['name']!, overflow: TextOverflow.ellipsis),
+                      leading: const Icon(Icons.description, color: Colors.blue),
+                      title: Text(anhang['name']!, overflow: TextOverflow.ellipsis, style: const TextStyle(decoration: TextDecoration.underline, color: Colors.blue)),
+                      onTap: () => _launchURL(anhang['url']!),
                       trailing: IconButton(
                         icon: const Icon(Icons.remove_circle, color: Colors.red),
                         onPressed: () {

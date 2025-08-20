@@ -1,13 +1,10 @@
 import 'package:flutter/material.dart';
-
-
-// --- ANFANG DER KORREKTUR ---
-// Der Pfad geht jetzt zwei Ebenen nach oben (aus kunden/ und aus screens/), um die models zu finden.
+import 'package:file_picker/file_picker.dart';
+import 'package:excel/excel.dart';
 import '../../models/geraet.dart';
 import '../../models/kunde.dart';
 import '../../models/standort.dart';
 import 'kunden_detail_screen.dart';
-// --- ENDE DER KORREKTUR ---
 
 class KundenScreen extends StatefulWidget {
   final List<Kunde> kunden;
@@ -22,6 +19,8 @@ class KundenScreen extends StatefulWidget {
   final Future<void> Function(List<Kunde>) onImport;
   final Future<void> Function(Geraet, Kunde, Standort) onAddGeraetForKunde;
   final Future<void> Function(Geraet, Kunde) onAddGeraetForKundeOhneStandort;
+  // --- NEUE FUNKTION ---
+  final Future<void> Function(Geraet, Standort) assignStandortToGeraet;
 
   const KundenScreen({
     Key? key,
@@ -37,6 +36,7 @@ class KundenScreen extends StatefulWidget {
     required this.onImport,
     required this.onAddGeraetForKunde,
     required this.onAddGeraetForKundeOhneStandort,
+    required this.assignStandortToGeraet, // --- NEU ---
   }) : super(key: key);
 
   @override
@@ -199,6 +199,7 @@ class _KundenScreenState extends State<KundenScreen> {
                                 onDeleteStandort: widget.onDeleteStandort,
                                 onAddGeraetForKunde: widget.onAddGeraetForKunde,
                                 onAddGeraetForKundeOhneStandort: widget.onAddGeraetForKundeOhneStandort,
+                                assignStandortToGeraet: widget.assignStandortToGeraet, // --- NEU ---
                               ),
                             ),
                           ),
@@ -206,12 +207,36 @@ class _KundenScreenState extends State<KundenScreen> {
                         IconButton(icon: const Icon(Icons.delete, color: Colors.red), onPressed: () => _deleteKunde(kunde)),
                       ],
                     ),
-                    children: kundenStandorte.map((standort) {
-                      return ListTile(
-                        leading: const Icon(Icons.location_city, color: Colors.grey),
-                        title: Text(standort.name),
-                        subtitle: Text('${standort.strasse}, ${standort.plz} ${standort.ort}'),
-                      );
+                    children: kundenStandorte.expand((standort) {
+                      final standortGeraete = widget.alleGeraete
+                          .where((g) => g.standortId == standort.id)
+                          .toList();
+
+                      List<Widget> standortWidgets = [
+                        ListTile(
+                          leading: const Icon(Icons.location_city, color: Colors.grey),
+                          title: Text(standort.name, style: const TextStyle(fontWeight: FontWeight.bold)),
+                          subtitle: Text('${standort.strasse}, ${standort.plz} ${standort.ort}'),
+                        ),
+                      ];
+
+                      if (standortGeraete.isNotEmpty) {
+                        standortWidgets.addAll(
+                            standortGeraete.map((geraet) {
+                              return Padding(
+                                padding: const EdgeInsets.only(left: 32.0, right: 16.0),
+                                child: ListTile(
+                                  dense: true,
+                                  leading: const Icon(Icons.print, color: Colors.black54, size: 20),
+                                  title: Text(geraet.modell),
+                                  subtitle: Text('SN: ${geraet.seriennummer}'),
+                                ),
+                              );
+                            })
+                        );
+                      }
+
+                      return standortWidgets;
                     }).toList(),
                   ),
                 );

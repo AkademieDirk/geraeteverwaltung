@@ -73,8 +73,6 @@ class FirestoreService {
     });
   }
 
-  // --- ANFANG DER KORREKTUR ---
-  // Die Funktion nimmt jetzt ein Ersatzteil und eine Menge entgegen.
   Future<void> addVerbautesTeil(String seriennummer, Ersatzteil teil, String lager, int menge) async {
     final ersatzteilRef = _db.collection('ersatzteile').doc(teil.id);
     final historieRef = _db.collection('historie').doc(seriennummer);
@@ -100,7 +98,6 @@ class FirestoreService {
       transaction.set(historieRef, {'teile': FieldValue.arrayUnion([verbautesTeil.toJson()])}, SetOptions(merge: true));
     });
   }
-  // --- ENDE DER KORREKTUR ---
 
   Future<void> updateVerbautesTeil(String seriennummer, VerbautesTeil geandertesTeil) async {
     final docRef = _db.collection('historie').doc(seriennummer);
@@ -195,6 +192,15 @@ class FirestoreService {
     final geraetRef = _db.collection('geraete').doc(geraet.id);
     return geraetRef.update({'status': 'Verkauft', 'kundeId': kunde.id, 'kundeName': kunde.name, 'standortId': standort.id, 'standortName': standort.name, 'nummer': ''});
   }
+
+  // --- ANFANG DER NEUEN FUNKTION ---
+  Future<void> assignStandortToGeraet(Geraet geraet, Standort standort) {
+    return _db.collection('geraete').doc(geraet.id).update({
+      'standortId': standort.id,
+      'standortName': standort.name,
+    });
+  }
+// --- ENDE DER NEUEN FUNKTION ---
 }
 
 void main() async {
@@ -294,7 +300,6 @@ class _MyHomePageState extends State<MyHomePage> {
                                   onAddErsatzteil: _firestoreService.addErsatzteil,
                                   onUpdateErsatzteil: _firestoreService.updateErsatzteil,
                                   onDeleteErsatzteil: _firestoreService.deleteErsatzteil,
-                                  // --- KORRIGIERTER AUFRUF ---
                                   onTeilVerbauen: _firestoreService.addVerbautesTeil,
                                   onDeleteVerbautesTeil: _firestoreService.deleteVerbautesTeil,
                                   onUpdateVerbautesTeil: _firestoreService.updateVerbautesTeil,
@@ -308,6 +313,7 @@ class _MyHomePageState extends State<MyHomePage> {
                                   onUpdateStandort: _firestoreService.updateStandort,
                                   onDeleteStandort: _firestoreService.deleteStandort,
                                   onAssignGeraet: _firestoreService.assignGeraetToKunde,
+                                  assignStandortToGeraet: _firestoreService.assignStandortToGeraet, // <-- NEU
                                   onAddGeraetForKunde: _firestoreService.addGeraetForKunde,
                                   onAddGeraetForKundeOhneStandort: _firestoreService.addGeraetForKundeOhneStandort,
                                 );

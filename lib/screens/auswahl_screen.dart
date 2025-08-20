@@ -1,20 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'geraeteaufnahme/geraeteaufnahme_screen.dart';
-import 'geraeteliste_screen.dart';
-import 'aufbereitung_screen.dart';
-import 'lagerverwaltung_screen.dart';
-import 'historie_screen.dart';
-import 'service/service_screen.dart';
-import 'kunden/kunden_screen.dart';
-import 'bestandsliste_screen.dart';
-import '../models/geraet.dart';
-import '../models/ersatzteil.dart';
-import '../models/verbautes_teil.dart';
-import '../models/kunde.dart';
-import '../models/standort.dart';
-import '../models/serviceeintrag.dart';
-import '../widgets/selection_box.dart';
+import 'package:projekte/screens/geraeteaufnahme/geraeteaufnahme_screen.dart';
+import 'package:projekte/screens/geraeteliste_screen.dart';
+import 'package:projekte/screens/aufbereitung_screen.dart';
+import 'package:projekte/screens/lagerverwaltung_screen.dart';
+import 'package:projekte/screens/historie_screen.dart';
+import 'package:projekte/screens/service/service_screen.dart';
+import 'package:projekte/screens/kunden/kunden_screen.dart';
+import 'package:projekte/screens/bestandsliste_screen.dart';
+import 'package:projekte/models/geraet.dart';
+import 'package:projekte/models/ersatzteil.dart';
+import 'package:projekte/models/verbautes_teil.dart';
+import 'package:projekte/models/kunde.dart';
+import 'package:projekte/models/standort.dart';
+import 'package:projekte/models/serviceeintrag.dart';
+import 'package:projekte/widgets/selection_box.dart';
 
 class AuswahlScreen extends StatelessWidget {
   final List<Geraet> geraete;
@@ -33,7 +33,6 @@ class AuswahlScreen extends StatelessWidget {
   final Future<void> Function(Ersatzteil) onUpdateErsatzteil;
   final Future<void> Function(String) onDeleteErsatzteil;
 
-  // --- KORRIGIERTE SIGNATUR ---
   final Future<void> Function(String, Ersatzteil, String, int) onTeilVerbauen;
   final Future<void> Function(String, VerbautesTeil) onDeleteVerbautesTeil;
   final Future<void> Function(String, VerbautesTeil) onUpdateVerbautesTeil;
@@ -52,6 +51,8 @@ class AuswahlScreen extends StatelessWidget {
   final Future<void> Function(Geraet, Kunde, Standort) onAssignGeraet;
   final Future<void> Function(Geraet, Kunde, Standort) onAddGeraetForKunde;
   final Future<void> Function(Geraet, Kunde) onAddGeraetForKundeOhneStandort;
+  // --- NEUE FUNKTION ---
+  final Future<void> Function(Geraet, Standort) assignStandortToGeraet;
 
   final Future<void> Function(Serviceeintrag) onAddServiceeintrag;
   final Future<void> Function(Serviceeintrag) onUpdateServiceeintrag;
@@ -87,6 +88,7 @@ class AuswahlScreen extends StatelessWidget {
     required this.onAssignGeraet,
     required this.onAddGeraetForKunde,
     required this.onAddGeraetForKundeOhneStandort,
+    required this.assignStandortToGeraet, // --- NEU ---
     required this.onAddServiceeintrag,
     required this.onUpdateServiceeintrag,
     required this.onDeleteServiceeintrag,
@@ -181,6 +183,7 @@ class AuswahlScreen extends StatelessWidget {
             onImport: onImportKunden,
             onAddGeraetForKunde: onAddGeraetForKunde,
             onAddGeraetForKundeOhneStandort: onAddGeraetForKundeOhneStandort,
+            assignStandortToGeraet: assignStandortToGeraet, // --- NEU ---
           ),
         )),
       },
