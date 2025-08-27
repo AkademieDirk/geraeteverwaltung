@@ -1,12 +1,9 @@
 import 'package:flutter/material.dart';
-// --- ANFANG DER KORREKTUR ---
-// Alle Import-Pfade wurden auf den absoluten 'package:'-Stil umgestellt.
-import 'package:projekte/models/geraet.dart';
-import 'package:projekte/models/ersatzteil.dart';
-import 'package:projekte/models/verbautes_teil.dart';
-import 'package:projekte/models/serviceeintrag.dart';
-import 'package:projekte/screens/historie_screen.dart';
-// --- ENDE DER KORREKTUR ---
+import '../models/geraet.dart';
+import '../models/ersatzteil.dart';
+import '../models/verbautes_teil.dart';
+import '../models/serviceeintrag.dart';
+import 'historie_screen.dart';
 
 class AufbereitungScreen extends StatefulWidget {
   final List<Geraet> alleGeraete;
@@ -158,6 +155,14 @@ class _AufbereitungScreenState extends State<AufbereitungScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // --- ANFANG DER ÄNDERUNG ---
+    // Erstellt eine sortierte Liste aller einzigartigen Kategorien aus den Ersatzteilen.
+    final alleKategorien = widget.alleErsatzteile
+        .map((teil) => teil.kategorie.isNotEmpty ? teil.kategorie : 'Sonstiges')
+        .toSet()
+        .toList()..sort();
+    // --- ENDE DER ÄNDERUNG ---
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Aufbereitung'),
@@ -217,21 +222,24 @@ class _AufbereitungScreenState extends State<AufbereitungScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      // --- ANFANG DER ÄNDERUNG ---
+                      // Das Dropdown verwendet jetzt die dynamisch erstellte Liste aller Kategorien.
                       DropdownButtonFormField<String>(
                         value: _selectedPartType,
                         decoration: const InputDecoration(labelText: 'Art des Ersatzteils', border: OutlineInputBorder()),
-                        items: ['Toner', 'Drum', 'Transferbelt', 'Entwickler', 'Fixiereinheit'].map((label) => DropdownMenuItem(value: label, child: Text(label))).toList(),
+                        items: alleKategorien.map((label) => DropdownMenuItem(value: label, child: Text(label))).toList(),
                         onChanged: (value) {
                           if (value == null) return;
                           setState(() {
                             _selectedPartType = value;
-                            _gefilterteErsatzteile = widget.alleErsatzteile.where((teil) => teil.kategorie == value).toList();
+                            _gefilterteErsatzteile = widget.alleErsatzteile.where((teil) => (teil.kategorie.isNotEmpty ? teil.kategorie : 'Sonstiges') == value).toList();
                             _selectedErsatzteil = null;
                             _foundArticle = null;
                             _articleNumberController.clear();
                           });
                         },
                       ),
+                      // --- ENDE DER ÄNDERUNG ---
                       const SizedBox(height: 16),
                       if (_gefilterteErsatzteile.isNotEmpty)
                         DropdownButtonFormField<Ersatzteil>(

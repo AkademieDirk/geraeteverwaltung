@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import '../models/geraet.dart';
-import '../screens/geraeteaufnahme/geraeteaufnahme_screen.dart';
+import 'package:projekte/models/geraet.dart';
+import 'package:projekte/screens/geraeteaufnahme/geraeteaufnahme_screen.dart';
 
 class BestandslisteGruppe extends StatelessWidget {
   final String modell;
@@ -33,51 +33,67 @@ class BestandslisteGruppe extends StatelessWidget {
           style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
         ),
         children: geraeteInGruppe.map((g) {
-          // --- ANFANG DER ÄNDERUNG ---
-          // Bestimmt die Farbe und das Icon basierend auf dem Status
           final bool maschinenblattVorhanden = g.maschinenblattErstellt == 'Ja';
           final iconColor = maschinenblattVorhanden ? Colors.green : Colors.red;
           final iconData = maschinenblattVorhanden ? Icons.check_circle : Icons.cancel;
-          // --- ENDE DER ÄNDERUNG ---
 
           return ListTile(
+            contentPadding: const EdgeInsets.only(left: 4, right: 16),
+            horizontalTitleGap: 8,
             leading: CircleAvatar(
               child: Text(g.nummer, textAlign: TextAlign.center),
             ),
             title: Row(
               children: [
                 Text('SN: ${g.seriennummer}'),
-                const SizedBox(width: 24),
-                Text(
-                  'Zähler: ${g.zaehlerGesamt.isNotEmpty ? g.zaehlerGesamt : 'k.A.'}',
-                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+
+                // --- ANFANG DER KORREKTUR ---
+                // Der Spacer wurde durch eine SizedBox mit fester Breite ersetzt.
+                // Ändere den 'width'-Wert, um den Abstand anzupassen.
+                const SizedBox(width: 150),
+
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'Zähler: ${g.zaehlerGesamt.isNotEmpty ? g.zaehlerGesamt : 'k.A.'}',
+                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(width: 16),
+                    Text(
+                      g.originaleinzugTyp.isNotEmpty ? g.originaleinzugTyp : 'k.A.',
+                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.blueAccent),
+                    ),
+                    const SizedBox(width: 16),
+                    Text(
+                      g.unterschrankTyp.isNotEmpty && g.unterschrankTyp != 'Kein'
+                          ? g.unterschrankTyp
+                          : 'Ohne US',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: g.unterschrankTyp.isNotEmpty && g.unterschrankTyp != 'Kein'
+                            ? Colors.purple.shade300
+                            : Colors.grey,
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 24),
-                Text(
-                  g.originaleinzugTyp.isNotEmpty ? g.originaleinzugTyp : 'k.A.',
-                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.blueAccent),
-                ),
+                // --- ENDE DER KORREKTUR ---
               ],
             ),
             trailing: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // --- ANFANG DER ÄNDERUNG ---
-                // Neuer IconButton, um den Status zu ändern und anzuzeigen
                 IconButton(
                   icon: Icon(iconData, color: iconColor),
                   tooltip: 'Maschinenblatt: ${g.maschinenblattErstellt}',
                   onPressed: () {
-                    // Kehrt den aktuellen Wert um
                     final neuerStatus = maschinenblattVorhanden ? 'Nein' : 'Ja';
-                    // Erstellt eine Kopie des Geräts mit dem neuen Status
                     final geaendertesGeraet = g.copyWith(maschinenblattErstellt: neuerStatus);
-                    // Speichert die Änderung sofort
                     onUpdate(geaendertesGeraet);
                   },
                 ),
-                // --- ENDE DER ÄNDERUNG ---
-
                 IconButton(icon: const Icon(Icons.local_shipping, color: Colors.blueAccent), tooltip: 'Ausliefern', onPressed: () => onShowZuordnungsDialog(g)),
                 IconButton(
                   icon: const Icon(Icons.edit, color: Colors.orange),

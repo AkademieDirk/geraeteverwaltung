@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
-import '../models/geraet.dart';
-import '../models/kunde.dart';
-import '../models/standort.dart';
-import 'geraeteaufnahme/geraeteaufnahme_screen.dart';
+import 'package:projekte/models/geraet.dart';
+import 'package:projekte/models/kunde.dart';
+import 'package:projekte/models/standort.dart';
+import 'package:projekte/screens/geraeteaufnahme/geraeteaufnahme_screen.dart';
 
 class GeraeteListeScreen extends StatefulWidget {
   final List<Geraet> geraete;
@@ -15,6 +15,8 @@ class GeraeteListeScreen extends StatefulWidget {
   final List<Standort> standorte;
   final Future<void> Function(Geraet, Kunde, Standort) onAssign;
   final Future<void> Function(List<Geraet>) onImport;
+  // --- NEUE FUNKTION ---
+  final Future<void> Function(Geraet, String) onReturn;
 
   const GeraeteListeScreen({
     Key? key,
@@ -25,6 +27,7 @@ class GeraeteListeScreen extends StatefulWidget {
     required this.standorte,
     required this.onAssign,
     required this.onImport,
+    required this.onReturn, // --- NEU ---
   }) : super(key: key);
 
   @override
@@ -61,6 +64,56 @@ class _GeraeteListeScreenState extends State<GeraeteListeScreen> {
       ).toList();
     }
   }
+
+  // --- ANFANG DER NEUEN FUNKTION ---
+  void _showRuecknahmeDialog(Geraet geraet) {
+    final nummerController = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Gerät ins Lager zurückbuchen'),
+        content: Form(
+          key: formKey,
+          child: TextFormField(
+            controller: nummerController,
+            autofocus: true,
+            decoration: const InputDecoration(
+              labelText: 'Feste Lagernummer*',
+              hintText: 'z.B. 1001',
+            ),
+            validator: (value) {
+              if (value == null || value.trim().isEmpty) {
+                return 'Bitte eine Nummer eingeben.';
+              }
+              // Prüft, ob diese Lagernummer bereits vergeben ist
+              if (widget.geraete.any((g) => g.nummer == value.trim())) {
+                return 'Diese Lagernummer ist bereits vergeben.';
+              }
+              return null;
+            },
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Abbrechen')),
+          ElevatedButton(
+            onPressed: () async {
+              if (formKey.currentState!.validate()) {
+                await widget.onReturn(geraet, nummerController.text.trim());
+                Navigator.pop(ctx);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Gerät ${geraet.modell} wurde ins Lager zurückgebucht.'), backgroundColor: Colors.green),
+                );
+              }
+            },
+            child: const Text('Bestätigen'),
+          )
+        ],
+      ),
+    );
+  }
+  // --- ENDE DER NEUEN FUNKTION ---
 
   Future<void> _druckeGeraetAsPdf(Geraet g) async {
     final pdf = pw.Document();
@@ -117,20 +170,25 @@ class _GeraeteListeScreenState extends State<GeraeteListeScreen> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.end,
                         children: [
+                          // --- ANFANG DER ÄNDERUNG ---
+                          IconButton(
+                            icon: const Icon(Icons.undo, color: Colors.blueGrey),
+                            tooltip: 'Ins Lager zurückbuchen',
+                            onPressed: () => _showRuecknahmeDialog(g),
+                          ),
+                          // --- ENDE DER ÄNDERUNG ---
                           IconButton(
                             icon: const Icon(Icons.edit, color: Colors.orange),
                             tooltip: 'Bearbeiten',
-                            // --- ANFANG DER KORREKTUR ---
                             onPressed: () => Navigator.push(context, MaterialPageRoute(
                               builder: (_) => GeraeteAufnahmeScreen(
                                 initialGeraet: g,
                                 onSave: widget.onUpdate,
                                 onImport: widget.onImport,
                                 alleGeraete: widget.geraete,
-                                isBestandsgeraet: true, // Dieser Parameter wurde hinzugefügt
+                                isBestandsgeraet: true,
                               ),
                             )),
-                            // --- ENDE DER KORREKTUR ---
                           ),
                           IconButton(icon: const Icon(Icons.delete, color: Colors.red), tooltip: 'Löschen', onPressed: () async {
                             final sicher = await showDialog<bool>(context: context, builder: (ctx) => AlertDialog(title: const Text('Löschen bestätigen'), content: Text('Gerät "${g.modell}" wirklich löschen?'), actions: [TextButton(child: const Text('Abbrechen'), onPressed: () => Navigator.pop(ctx, false)), TextButton(child: const Text('Löschen', style: TextStyle(color: Colors.red)), onPressed: () => Navigator.pop(ctx, true))]));

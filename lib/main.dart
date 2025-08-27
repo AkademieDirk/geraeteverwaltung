@@ -52,6 +52,16 @@ class FirestoreService {
     );
     return _db.collection('geraete').add(geraetMitKunde.toJson());
   }
+  Future<void> returnGeraetToLager(Geraet geraetToReturn, String neueNummer) async {
+    return _db.collection('geraete').doc(geraetToReturn.id).update({
+      'status': 'Im Lager',
+      'kundeId': null,
+      'kundeName': '',
+      'standortId': null,
+      'standortName': '',
+      'nummer': neueNummer,
+    });
+  }
 
   // --- Ersatzteil-Operationen ---
   Stream<List<Ersatzteil>> getErsatzteile() => _db.collection('ersatzteile').snapshots().map((snapshot) => snapshot.docs.map((doc) => Ersatzteil.fromFirestore(doc)).toList());
@@ -72,7 +82,6 @@ class FirestoreService {
       return historie;
     });
   }
-
   Future<void> addVerbautesTeil(String seriennummer, Ersatzteil teil, String lager, int menge) async {
     final ersatzteilRef = _db.collection('ersatzteile').doc(teil.id);
     final historieRef = _db.collection('historie').doc(seriennummer);
@@ -98,7 +107,6 @@ class FirestoreService {
       transaction.set(historieRef, {'teile': FieldValue.arrayUnion([verbautesTeil.toJson()])}, SetOptions(merge: true));
     });
   }
-
   Future<void> updateVerbautesTeil(String seriennummer, VerbautesTeil geandertesTeil) async {
     final docRef = _db.collection('historie').doc(seriennummer);
     final doc = await docRef.get();
@@ -158,7 +166,6 @@ class FirestoreService {
   Future<void> updateServiceeintrag(Serviceeintrag eintrag) => _db.collection('servicehistorie').doc(eintrag.id).update(eintrag.toJson());
   Future<void> deleteServiceeintrag(String eintragId) => _db.collection('servicehistorie').doc(eintragId).delete();
 
-
   // --- Kunden-Operationen ---
   Stream<List<Kunde>> getKunden() => _db.collection('kunden').snapshots().map((snapshot) => snapshot.docs.map((doc) => Kunde.fromFirestore(doc)).toList());
   Future<void> updateKunde(Kunde kunde) => _db.collection('kunden').doc(kunde.id).update(kunde.toJson());
@@ -192,15 +199,12 @@ class FirestoreService {
     final geraetRef = _db.collection('geraete').doc(geraet.id);
     return geraetRef.update({'status': 'Verkauft', 'kundeId': kunde.id, 'kundeName': kunde.name, 'standortId': standort.id, 'standortName': standort.name, 'nummer': ''});
   }
-
-  // --- ANFANG DER NEUEN FUNKTION ---
   Future<void> assignStandortToGeraet(Geraet geraet, Standort standort) {
     return _db.collection('geraete').doc(geraet.id).update({
       'standortId': standort.id,
       'standortName': standort.name,
     });
   }
-// --- ENDE DER NEUEN FUNKTION ---
 }
 
 void main() async {
@@ -313,9 +317,10 @@ class _MyHomePageState extends State<MyHomePage> {
                                   onUpdateStandort: _firestoreService.updateStandort,
                                   onDeleteStandort: _firestoreService.deleteStandort,
                                   onAssignGeraet: _firestoreService.assignGeraetToKunde,
-                                  assignStandortToGeraet: _firestoreService.assignStandortToGeraet, // <-- NEU
+                                  assignStandortToGeraet: _firestoreService.assignStandortToGeraet,
                                   onAddGeraetForKunde: _firestoreService.addGeraetForKunde,
                                   onAddGeraetForKundeOhneStandort: _firestoreService.addGeraetForKundeOhneStandort,
+                                  onReturnGeraet: _firestoreService.returnGeraetToLager,
                                 );
                               }
                           );

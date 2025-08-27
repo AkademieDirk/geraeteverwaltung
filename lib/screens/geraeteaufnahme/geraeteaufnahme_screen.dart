@@ -80,7 +80,6 @@ class _GeraeteAufnahmeScreenState extends State<GeraeteAufnahmeScreen> {
   final _dokumenteneinzugController = TextEditingController();
   final _duplexController = TextEditingController();
   final _bemerkungController = TextEditingController();
-  // --- NEUES FELD ---
   String _selectedMaschinenblatt = 'Nein';
 
   @override
@@ -138,7 +137,6 @@ class _GeraeteAufnahmeScreenState extends State<GeraeteAufnahmeScreen> {
       _dokumenteneinzugController.text = g.dokumenteneinzug;
       _duplexController.text = g.duplex;
       _bemerkungController.text = g.bemerkung;
-      // --- NEUES FELD LADEN ---
       _selectedMaschinenblatt = g.maschinenblattErstellt;
     } else {
       _selectedAufnahmeDatum = DateTime.now();
@@ -219,8 +217,12 @@ class _GeraeteAufnahmeScreenState extends State<GeraeteAufnahmeScreen> {
 
     String clean(String val) => val == 'Nichts ausgewählt' ? '' : val;
 
-    final neuesGeraet = Geraet(
-      id: widget.initialGeraet?.id ?? '',
+    // --- ANFANG DER KORREKTUR ---
+    // Wir verwenden das bestehende Gerät als Vorlage und überschreiben nur die geänderten Felder.
+    // Das stellt sicher, dass Status, Kunde etc. erhalten bleiben.
+    final basisGeraet = widget.initialGeraet ?? Geraet(nummer: '', modell: '', seriennummer: '');
+
+    final neuesGeraet = basisGeraet.copyWith(
       nummer: _nummerController.text.trim(),
       modell: clean(_selectedModell),
       seriennummer: _seriennummerController.text.trim(),
@@ -265,9 +267,9 @@ class _GeraeteAufnahmeScreenState extends State<GeraeteAufnahmeScreen> {
       dokumenteneinzug: _dokumenteneinzugController.text.trim(),
       duplex: _duplexController.text.trim(),
       bemerkung: _bemerkungController.text.trim(),
-      // --- NEUES FELD SPEICHERN ---
       maschinenblattErstellt: _selectedMaschinenblatt,
     );
+    // --- ENDE DER KORREKTUR ---
 
     await widget.onSave(neuesGeraet);
 
@@ -375,9 +377,7 @@ class _GeraeteAufnahmeScreenState extends State<GeraeteAufnahmeScreen> {
               DropdownButtonFormField<String>(value: _selectedModell, decoration: const InputDecoration(labelText: 'Modell*'), items: _modellOptionen.map((m) => DropdownMenuItem(value: m, child: Text(m))).toList(), onChanged: (val) => setState(() => _selectedModell = val ?? 'Nichts ausgewählt')),
               TextFormField(controller: _seriennummerController, decoration: const InputDecoration(labelText: 'Seriennummer')),
 
-              // --- NEUES AUSWAHLFELD ---
               _buildChoiceChipRow('Maschinenblatt erstellt', _selectedMaschinenblatt, (val) => setState(() => _selectedMaschinenblatt = val)),
-
               _buildChoiceChipRow('I-Option', _selectedIOption, (val) => setState(() => _selectedIOption = val)),
               DropdownButtonFormField<String>(value: _selectedPdfTyp, decoration: const InputDecoration(labelText: 'PDF Typ'), items: _pdfTypen.map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(), onChanged: (val) => setState(() => _selectedPdfTyp = val ?? 'Nichts ausgewählt')),
               _buildChoiceChipRow('Durchsuchbar', _selectedDurchsuchbar, (val) => setState(() => _selectedDurchsuchbar = val)),

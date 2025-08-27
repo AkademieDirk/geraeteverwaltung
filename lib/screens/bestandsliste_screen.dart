@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-
-
+import 'package:file_picker/file_picker.dart';
+import 'package:excel/excel.dart';
 import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
@@ -46,7 +46,6 @@ class _BestandslisteScreenState extends State<BestandslisteScreen> {
   String _selectedOcrFilter = 'Alle';
   final List<String> _ocrFilterOptionen = ['Alle', 'Ja', 'Nein'];
 
-  // --- NEUER FILTER ---
   String _selectedMaschinenblattFilter = 'Alle';
   final List<String> _maschinenblattFilterOptionen = ['Alle', 'Ja', 'Nein'];
 
@@ -90,7 +89,6 @@ class _BestandslisteScreenState extends State<BestandslisteScreen> {
               text: '$modell (${geraeteInGruppe.length} Stk.)',
             ));
 
-            // --- DRUCKFUNKTION ERWEITERT ---
             content.add(pw.TableHelper.fromTextArray(
                 headers: ['Lager-Nr.', 'Seriennummer', 'Maschinenblatt', 'Zähler'],
                 data: geraeteInGruppe.map((g) => [
@@ -119,17 +117,173 @@ class _BestandslisteScreenState extends State<BestandslisteScreen> {
     await Printing.layoutPdf(onLayout: (PdfPageFormat format) async => pdf.save());
   }
 
+  // --- ANFANG DER KORREKTUR ---
   Future<void> _importGeraete() async {
-    // Implementierung...
+    setState(() => _isImporting = true);
+    try {
+      FilePickerResult? result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['xlsx', 'csv'],
+      );
+
+      if (result != null && result.files.single.bytes != null) {
+        var bytes = result.files.single.bytes!;
+        var excel = Excel.decodeBytes(bytes);
+        var sheet = excel.tables[excel.tables.keys.first];
+
+        if (sheet == null) throw Exception("Kein Tabellenblatt in der Datei gefunden.");
+
+        List<Geraet> geraeteToImport = [];
+        for (var i = 1; i < sheet.rows.length; i++) {
+          var row = sheet.rows[i];
+          if (row.length >= 3 && row[0] != null && row[1] != null && row[2] != null) {
+            geraeteToImport.add(Geraet(
+              nummer: row[0]?.value.toString() ?? '',
+              modell: row[1]?.value.toString() ?? '',
+              seriennummer: row[2]?.value.toString() ?? '',
+              mitarbeiter: row.length > 3 ? row[3]?.value.toString() ?? '' : '',
+              lieferant: row.length > 5 ? row[5]?.value.toString() ?? '' : '',
+            ));
+          }
+        }
+
+        if (geraeteToImport.isNotEmpty) {
+          await widget.onImport(geraeteToImport);
+          if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${geraeteToImport.length} neue Geräte erfolgreich importiert!'), backgroundColor: Colors.green));
+        } else {
+          if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Keine neuen Geräte in der Datei gefunden.'), backgroundColor: Colors.orange));
+        }
+      }
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Fehler beim Import: ${e.toString()}'), backgroundColor: Colors.red));
+    } finally {
+      if (mounted) setState(() => _isImporting = false);
+    }
   }
 
   void _showZuordnungsDialog(Geraet geraet) {
-    // Implementierung...
+    Kunde? selectedKunde;
+    Standort? selectedStandort;
+    List<Standort> kundenStandorte = [];
+    String kundenSuchbegriff = '';
+    List<Kunde> gefilterteKunden = widget.kunden;
+
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: Text('Gerät "${geraet.modell}" ausliefern'),
+              content: SingleChildScrollView(
+                child: SizedBox(
+                  width: MediaQuery.of(context).size.width * 0.4,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      TextField(
+                        autofocus: true,
+                        decoration: const InputDecoration(
+                          labelText: 'Kunde suchen (Name oder Kundennr.)',
+                          prefixIcon: Icon(Icons.search),
+                        ),
+                        onChanged: (wert) {
+                          setDialogState(() {
+                            kundenSuchbegriff = wert.toLowerCase();
+                            gefilterteKunden = widget.kunden.where((k) {
+                              return k.name.toLowerCase().contains(kundenSuchbegriff) ||
+                                  k.kundennummer.toLowerCase().contains(kundenSuchbegriff);
+                            }).toList();
+                            selectedKunde = null;
+                            selectedStandort = null;
+                          });
+                        },
+                      ),
+                      const SizedBox(height: 24),
+                      DropdownButtonFormField<Kunde>(
+                        value: selectedKunde,
+                        hint: const Text('Kunde auswählen'),
+                        isExpanded: true,
+                        items: gefilterteKunden.map((k) => DropdownMenuItem(value: k, child: Text(k.name))).toList(),
+                        onChanged: (val) {
+                          setDialogState(() {
+                            selectedKunde = val;
+                            selectedStandort = null;
+                            if (selectedKunde != null) {
+                              kundenStandorte = widget.standorte.where((s) => s.kundeId == selectedKunde!.id).toList();
+                            } else {
+                              kundenStandorte = [];
+                            }
+                          });
+                        },
+                      ),
+                      const SizedBox(height: 16),
+                      if (selectedKunde != null)
+                        DropdownButtonFormField<Standort>(
+                          value: selectedStandort,
+                          hint: const Text('Standort auswählen'),
+                          isExpanded: true,
+                          items: kundenStandorte.map((s) => DropdownMenuItem(value: s, child: Text(s.name))).toList(),
+                          onChanged: (val) {
+                            setDialogState(() {
+                              selectedStandort = val;
+                            });
+                          },
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+              actions: [
+                TextButton(child: const Text('Abbrechen'), onPressed: () => Navigator.of(ctx).pop()),
+                ElevatedButton(
+                  child: const Text('Bestätigen & Ausliefern'),
+                  onPressed: (selectedKunde != null && selectedStandort != null)
+                      ? () async {
+                    await widget.onAssign(geraet, selectedKunde!, selectedStandort!);
+                    Navigator.of(ctx).pop();
+                  }
+                      : null,
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
   }
 
   void _showDeleteConfirmationDialog(Geraet geraet) {
-    // Implementierung...
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Löschen bestätigen'),
+        content: Text('Sind Sie sicher, dass Sie das Gerät "${geraet.modell}" (SN: ${geraet.seriennummer}) endgültig löschen möchten?'),
+        actions: <Widget>[
+          TextButton(
+            child: const Text('Abbrechen'),
+            onPressed: () {
+              Navigator.of(ctx).pop();
+            },
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Löschen'),
+            onPressed: () async {
+              Navigator.of(ctx).pop();
+              await widget.onDelete(geraet.id);
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Gerät wurde gelöscht.'), backgroundColor: Colors.green),
+                );
+              }
+            },
+          ),
+        ],
+      ),
+    );
   }
+  // --- ENDE DER KORREKTUR ---
 
   @override
   Widget build(BuildContext context) {
@@ -143,7 +297,6 @@ class _BestandslisteScreenState extends State<BestandslisteScreen> {
       gefilterteListe = gefilterteListe.where((g) => g.ocr == _selectedOcrFilter).toList();
     }
 
-    // --- NEUER FILTER WIRD ANGEWENDET ---
     if (_selectedMaschinenblattFilter != 'Alle') {
       gefilterteListe = gefilterteListe.where((g) => g.maschinenblattErstellt == _selectedMaschinenblattFilter).toList();
     }
@@ -240,7 +393,6 @@ class _BestandslisteScreenState extends State<BestandslisteScreen> {
               ],
             ),
           ),
-          // --- NEUES FILTER-DROPDOWN ---
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
             child: DropdownButtonFormField<String>(

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:file_picker/file_picker.dart';
-import 'package:excel/excel.dart';
+
+
 import '../../models/geraet.dart';
 import '../../models/kunde.dart';
 import '../../models/standort.dart';
@@ -19,7 +19,6 @@ class KundenScreen extends StatefulWidget {
   final Future<void> Function(List<Kunde>) onImport;
   final Future<void> Function(Geraet, Kunde, Standort) onAddGeraetForKunde;
   final Future<void> Function(Geraet, Kunde) onAddGeraetForKundeOhneStandort;
-  // --- NEUE FUNKTION ---
   final Future<void> Function(Geraet, Standort) assignStandortToGeraet;
 
   const KundenScreen({
@@ -36,7 +35,7 @@ class KundenScreen extends StatefulWidget {
     required this.onImport,
     required this.onAddGeraetForKunde,
     required this.onAddGeraetForKundeOhneStandort,
-    required this.assignStandortToGeraet, // --- NEU ---
+    required this.assignStandortToGeraet,
   }) : super(key: key);
 
   @override
@@ -168,7 +167,7 @@ class _KundenScreenState extends State<KundenScreen> {
                               anzahlGeraete > 3 ? 3 : anzahlGeraete,
                                   (index) => const Padding(
                                 padding: EdgeInsets.symmetric(horizontal: 1.0),
-                                child: Icon(Icons.print, size: 18, color: Colors.green),
+                                child: Icon(Icons.print, size: 22, color: Colors.green),
                               ),
                             ),
                           ),
@@ -199,7 +198,7 @@ class _KundenScreenState extends State<KundenScreen> {
                                 onDeleteStandort: widget.onDeleteStandort,
                                 onAddGeraetForKunde: widget.onAddGeraetForKunde,
                                 onAddGeraetForKundeOhneStandort: widget.onAddGeraetForKundeOhneStandort,
-                                assignStandortToGeraet: widget.assignStandortToGeraet, // --- NEU ---
+                                assignStandortToGeraet: widget.assignStandortToGeraet,
                               ),
                             ),
                           ),
@@ -207,37 +206,65 @@ class _KundenScreenState extends State<KundenScreen> {
                         IconButton(icon: const Icon(Icons.delete, color: Colors.red), onPressed: () => _deleteKunde(kunde)),
                       ],
                     ),
-                    children: kundenStandorte.expand((standort) {
-                      final standortGeraete = widget.alleGeraete
-                          .where((g) => g.standortId == standort.id)
-                          .toList();
+                    children: [
+                      // --- ANFANG DER ÄNDERUNG ---
+                      if (kundenStandorte.isEmpty)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Divider(),
+                              if (kunde.ansprechpartner.isNotEmpty)
+                                ListTile(dense: true, leading: Icon(Icons.person, color: Colors.grey.shade600), title: Text(kunde.ansprechpartner), subtitle: Text('Ansprechpartner')),
+                              if (kunde.telefon.isNotEmpty)
+                                ListTile(dense: true, leading: Icon(Icons.phone, color: Colors.grey.shade600), title: Text(kunde.telefon), subtitle: Text('Telefon')),
+                              if (kunde.email.isNotEmpty)
+                                ListTile(dense: true, leading: Icon(Icons.email, color: Colors.grey.shade600), title: Text(kunde.email), subtitle: Text('E-Mail')),
+                              if (kunde.strasse.isNotEmpty)
+                                ListTile(dense: true, leading: Icon(Icons.location_on, color: Colors.grey.shade600), title: Text('${kunde.strasse}, ${kunde.plz} ${kunde.ort}'), subtitle: Text('Hauptsitz')),
+                              const ListTile(
+                                dense: true,
+                                leading: Icon(Icons.info_outline, color: Colors.grey),
+                                title: Text('Für diesen Kunden sind keine Standorte hinterlegt.'),
+                              ),
+                            ],
+                          ),
+                        )
+                      else
+                        ...kundenStandorte.expand((standort) {
+                          final standortGeraete = widget.alleGeraete
+                              .where((g) => g.standortId == standort.id)
+                              .toList();
 
-                      List<Widget> standortWidgets = [
-                        ListTile(
-                          leading: const Icon(Icons.location_city, color: Colors.grey),
-                          title: Text(standort.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-                          subtitle: Text('${standort.strasse}, ${standort.plz} ${standort.ort}'),
-                        ),
-                      ];
+                          List<Widget> standortWidgets = [
+                            ListTile(
+                              leading: const Icon(Icons.location_city, color: Colors.grey),
+                              title: Text(standort.name, style: const TextStyle(fontWeight: FontWeight.bold)),
+                              subtitle: Text('${standort.strasse}, ${standort.plz} ${standort.ort}'),
+                            ),
+                          ];
 
-                      if (standortGeraete.isNotEmpty) {
-                        standortWidgets.addAll(
-                            standortGeraete.map((geraet) {
-                              return Padding(
-                                padding: const EdgeInsets.only(left: 32.0, right: 16.0),
-                                child: ListTile(
-                                  dense: true,
-                                  leading: const Icon(Icons.print, color: Colors.black54, size: 20),
-                                  title: Text(geraet.modell),
-                                  subtitle: Text('SN: ${geraet.seriennummer}'),
-                                ),
-                              );
-                            })
-                        );
-                      }
+                          if (standortGeraete.isNotEmpty) {
+                            standortWidgets.addAll(
+                                standortGeraete.map((geraet) {
+                                  return Padding(
+                                    padding: const EdgeInsets.only(left: 32.0, right: 16.0),
+                                    child: ListTile(
+                                      dense: true,
+                                      leading: const Icon(Icons.print, color: Colors.black54, size: 20),
+                                      title: Text(geraet.modell),
+                                      subtitle: Text('SN: ${geraet.seriennummer}'),
+                                    ),
+                                  );
+                                })
+                            );
+                          }
 
-                      return standortWidgets;
-                    }).toList(),
+                          return standortWidgets;
+                        }),
+                      // --- ENDE DER ÄNDERUNG ---
+                    ],
                   ),
                 );
               },

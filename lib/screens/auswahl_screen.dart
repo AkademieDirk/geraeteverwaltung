@@ -49,10 +49,11 @@ class AuswahlScreen extends StatelessWidget {
   final Future<void> Function(String) onDeleteStandort;
 
   final Future<void> Function(Geraet, Kunde, Standort) onAssignGeraet;
+  final Future<void> Function(Geraet, Standort) assignStandortToGeraet;
   final Future<void> Function(Geraet, Kunde, Standort) onAddGeraetForKunde;
   final Future<void> Function(Geraet, Kunde) onAddGeraetForKundeOhneStandort;
   // --- NEUE FUNKTION ---
-  final Future<void> Function(Geraet, Standort) assignStandortToGeraet;
+  final Future<void> Function(Geraet, String) onReturnGeraet;
 
   final Future<void> Function(Serviceeintrag) onAddServiceeintrag;
   final Future<void> Function(Serviceeintrag) onUpdateServiceeintrag;
@@ -86,9 +87,10 @@ class AuswahlScreen extends StatelessWidget {
     required this.onUpdateStandort,
     required this.onDeleteStandort,
     required this.onAssignGeraet,
+    required this.assignStandortToGeraet,
     required this.onAddGeraetForKunde,
     required this.onAddGeraetForKundeOhneStandort,
-    required this.assignStandortToGeraet, // --- NEU ---
+    required this.onReturnGeraet, // --- NEU ---
     required this.onAddServiceeintrag,
     required this.onUpdateServiceeintrag,
     required this.onDeleteServiceeintrag,
@@ -146,7 +148,25 @@ class AuswahlScreen extends StatelessWidget {
 
     final List<Map<String, dynamic>> uebersichten = [
       {'title': 'Bestandsliste', 'icon': Icons.inventory, 'color': Colors.blueAccent, 'onTap': () => Navigator.push(context, MaterialPageRoute(builder: (_) => BestandslisteScreen(alleGeraete: geraete, onUpdate: onUpdateGeraet, onDelete: onDeleteGeraet, kunden: kunden, standorte: standorte, onAssign: onAssignGeraet, onImport: onImportGeraete)))},
-      {'title': 'Geräteliste (Alle)', 'icon': Icons.list_alt, 'color': Colors.green, 'onTap': () => Navigator.push(context, MaterialPageRoute(builder: (_) => GeraeteListeScreen(geraete: geraete, onUpdate: onUpdateGeraet, onDelete: onDeleteGeraet, kunden: kunden, standorte: standorte, onAssign: onAssignGeraet, onImport: onImportGeraete)))},
+      // --- ANFANG DER ÄNDERUNG ---
+      {
+        'title': 'Geräteliste (Alle)',
+        'icon': Icons.list_alt,
+        'color': Colors.green,
+        'onTap': () => Navigator.push(context, MaterialPageRoute(
+          builder: (_) => GeraeteListeScreen(
+            geraete: geraete,
+            onUpdate: onUpdateGeraet,
+            onDelete: onDeleteGeraet,
+            kunden: kunden,
+            standorte: standorte,
+            onAssign: onAssignGeraet,
+            onImport: onImportGeraete,
+            onReturn: onReturnGeraet, // <-- Hier weitergeben
+          ),
+        )),
+      },
+      // --- ENDE DER ÄNDERUNG ---
       {
         'title': 'Historie',
         'icon': Icons.history,
@@ -183,7 +203,7 @@ class AuswahlScreen extends StatelessWidget {
             onImport: onImportKunden,
             onAddGeraetForKunde: onAddGeraetForKunde,
             onAddGeraetForKundeOhneStandort: onAddGeraetForKundeOhneStandort,
-            assignStandortToGeraet: assignStandortToGeraet, // --- NEU ---
+            assignStandortToGeraet: assignStandortToGeraet,
           ),
         )),
       },
