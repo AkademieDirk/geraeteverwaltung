@@ -1,16 +1,30 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+
+// Import für plattformübergreifendes URL-Öffnen (bevorzugt für Nicht-Web)
+import 'package:url_launcher/url_launcher.dart';
+
+// Zum Prüfen, ob wir im Web sind
+import 'package:flutter/foundation.dart' show kIsWeb;
+
+// Importiere die Datei mit der plattform-konditionalen Web-Funktion
+// und weise ihr einen Präfix zu, um die Funktion eindeutig aufrufen zu können.
+import 'package:projekte/utils/url_launcher_web.dart' as web_launcher; // <--- KORREKTUR HIER
+
+// Model Imports
 import 'package:projekte/models/geraet.dart';
 import 'package:projekte/models/ersatzteil.dart';
 import 'package:projekte/models/verbautes_teil.dart';
 import 'package:projekte/models/serviceeintrag.dart';
-import 'package:projekte/screens/service/serviceeintrag_screen.dart'; // Import für den ServiceeintragScreen
-import 'dart:html' as html;
+
+// Screen Imports
+import 'package:projekte/screens/service/serviceeintrag_screen.dart';
+
 // --- PDF GENERIERUNGS IMPORTE ---
-import 'package:pdf/pdf.dart'; // Für PDF-Formatierung
-import 'package:pdf/widgets.dart' as pw; // Für PDF-Widgets
-import 'package:printing/printing.dart'; // Für das Drucken und Anzeigen des PDFs
-import 'package:flutter/services.dart' show rootBundle; // Für das Laden von Assets/Fonts
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
+import 'package:flutter/services.dart' show rootBundle;
 // --- ENDE PDF IMPORTE ---
 
 
@@ -49,8 +63,24 @@ class _ServiceScreenState extends State<ServiceScreen> {
     super.dispose();
   }
 
-  void _openInNewTab(String url) {
-    html.window.open(url, '_blank');
+  // Angepasste _openInNewTab Funktion
+  void _openInNewTab(String url) async {
+    if (kIsWeb) {
+      // Wenn wir im Web sind, nutzen wir unsere spezielle Web-Funktion über den Präfix.
+      web_launcher.openUrlInNewTabWeb(url); // <--- KORREKTUR HIER
+    } else {
+      // Für alle anderen Plattformen nutzen wir url_launcher
+      final Uri uri = Uri.parse(url);
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri);
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Konnte die URL auf dieser Plattform nicht öffnen: $url')),
+          );
+        }
+      }
+    }
   }
 
   void _deleteServiceeintrag(Serviceeintrag eintrag) async {
@@ -198,7 +228,7 @@ class _ServiceScreenState extends State<ServiceScreen> {
                 pw.SizedBox(height: 20),
               ],
 
-              pw.Spacer(), // Schiebt den Footer nach unten
+              pw.Spacer(),
               pw.Divider(),
               pw.Center(
                 child: pw.Text(
@@ -421,16 +451,28 @@ class _ServiceScreenState extends State<ServiceScreen> {
         title: Text(_selectedGeraet == null ? 'Service: Gerät auswählen' : 'Service-Historie'),
         actions: [
           if (_selectedGeraet != null)
-            TextButton(
-              onPressed: () {
-                setState(() {
-                  _selectedGeraet = null;
-                  _searchController.clear();
-                  _searchTerm = '';
-                });
-              },
-              child: const Text('Gerät wechseln', style: TextStyle(color: Colors.white)),
-            )
+            Padding( // Füge Padding hinzu, um den Button etwas vom Rand abzusetzen
+              padding: const EdgeInsets.symmetric(horizontal: 8.0),
+              child: ElevatedButton.icon( // Ändere von TextButton zu ElevatedButton.icon
+                icon: const Icon(Icons.arrow_back_ios, color: Colors.white, size: 18), // Ein klares "Zurück"-Icon
+                label: const Text('Gerät wechseln', style: TextStyle(color: Colors.white)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Theme.of(context).colorScheme.primary.withOpacity(0.8), // Leichte Variation der Primärfarbe
+                  foregroundColor: Colors.white, // Textfarbe auf Weiß
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8), // Abgerundete Ecken
+                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8), // Mehr Padding für Größe
+                ),
+                onPressed: () {
+                  setState(() {
+                    _selectedGeraet = null;
+                    _searchController.clear();
+                    _searchTerm = '';
+                  });
+                },
+              ),
+            ),
         ],
       ),
       body: _selectedGeraet == null
