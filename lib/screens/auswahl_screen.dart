@@ -33,7 +33,11 @@ class AuswahlScreen extends StatelessWidget {
   final Future<void> Function(Ersatzteil) onUpdateErsatzteil;
   final Future<void> Function(String) onDeleteErsatzteil;
 
-  final Future<void> Function(String, Ersatzteil, String, int) onTeilVerbauen;
+  // --- ANFANG DER KORREKTUR ---
+  // Die Signatur wird an die main.dart angepasst: Sie gibt ein VerbautesTeil zurück.
+  final Future<VerbautesTeil> Function(String, Ersatzteil, String, int) onTeilVerbauen;
+  // --- ENDE DER KORREKTUR ---
+
   final Future<void> Function(String, VerbautesTeil) onDeleteVerbautesTeil;
   final Future<void> Function(String, VerbautesTeil) onUpdateVerbautesTeil;
   final Future<void> Function(Ersatzteil, String, String, int) onTransfer;
@@ -52,7 +56,6 @@ class AuswahlScreen extends StatelessWidget {
   final Future<void> Function(Geraet, Standort) assignStandortToGeraet;
   final Future<void> Function(Geraet, Kunde, Standort) onAddGeraetForKunde;
   final Future<void> Function(Geraet, Kunde) onAddGeraetForKundeOhneStandort;
-  // --- NEUE FUNKTION ---
   final Future<void> Function(Geraet, String) onReturnGeraet;
 
   final Future<void> Function(Serviceeintrag) onAddServiceeintrag;
@@ -90,7 +93,7 @@ class AuswahlScreen extends StatelessWidget {
     required this.assignStandortToGeraet,
     required this.onAddGeraetForKunde,
     required this.onAddGeraetForKundeOhneStandort,
-    required this.onReturnGeraet, // --- NEU ---
+    required this.onReturnGeraet,
     required this.onAddServiceeintrag,
     required this.onUpdateServiceeintrag,
     required this.onDeleteServiceeintrag,
@@ -148,7 +151,6 @@ class AuswahlScreen extends StatelessWidget {
 
     final List<Map<String, dynamic>> uebersichten = [
       {'title': 'Bestandsliste', 'icon': Icons.inventory, 'color': Colors.blueAccent, 'onTap': () => Navigator.push(context, MaterialPageRoute(builder: (_) => BestandslisteScreen(alleGeraete: geraete, onUpdate: onUpdateGeraet, onDelete: onDeleteGeraet, kunden: kunden, standorte: standorte, onAssign: onAssignGeraet, onImport: onImportGeraete)))},
-      // --- ANFANG DER ÄNDERUNG ---
       {
         'title': 'Geräteliste (Alle)',
         'icon': Icons.list_alt,
@@ -162,11 +164,10 @@ class AuswahlScreen extends StatelessWidget {
             standorte: standorte,
             onAssign: onAssignGeraet,
             onImport: onImportGeraete,
-            onReturn: onReturnGeraet, // <-- Hier weitergeben
+            onReturn: onReturnGeraet,
           ),
         )),
       },
-      // --- ENDE DER ÄNDERUNG ---
       {
         'title': 'Historie',
         'icon': Icons.history,

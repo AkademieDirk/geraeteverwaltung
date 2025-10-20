@@ -1,16 +1,19 @@
 import 'package:flutter/material.dart';
-import '../models/geraet.dart';
-import '../models/ersatzteil.dart';
-import '../models/verbautes_teil.dart';
-import '../models/serviceeintrag.dart';
-import 'historie_screen.dart';
+import 'package:projekte/models/ersatzteil.dart';
+import 'package:projekte/models/geraet.dart';
+import 'package:projekte/models/serviceeintrag.dart';
+import 'package:projekte/models/verbautes_teil.dart';
+import 'package:projekte/screens/historie_screen.dart';
 
 class AufbereitungScreen extends StatefulWidget {
   final List<Geraet> alleGeraete;
   final List<Ersatzteil> alleErsatzteile;
   final Map<String, List<VerbautesTeil>> verbauteTeile;
   final List<Serviceeintrag> alleServiceeintraege;
-  final Future<void> Function(String, Ersatzteil, String, int) onTeilVerbauen;
+
+  // WICHTIG: Rückgabetyp jetzt Future<VerbautesTeil>
+  final Future<VerbautesTeil> Function(String, Ersatzteil, String, int) onTeilVerbauen;
+
   final Future<void> Function(String, VerbautesTeil) onDeleteVerbautesTeil;
   final Future<void> Function(String, VerbautesTeil) onUpdateVerbautesTeil;
   final Future<void> Function(String) onDeleteServiceeintrag;
@@ -79,7 +82,8 @@ class _AufbereitungScreenState extends State<AufbereitungScreen> {
         _foundArticle = ersatzteil;
         _articleNumberController.text = ersatzteil.artikelnummer;
         _selectedPartType = ersatzteil.kategorie;
-        _gefilterteErsatzteile = widget.alleErsatzteile.where((t) => t.kategorie == _selectedPartType).toList();
+        _gefilterteErsatzteile =
+            widget.alleErsatzteile.where((t) => t.kategorie == _selectedPartType).toList();
         _selectedErsatzteil = ersatzteil;
       });
     } catch (e) {
@@ -94,15 +98,17 @@ class _AufbereitungScreenState extends State<AufbereitungScreen> {
       return;
     }
 
-    final menge = await _showMengenEingabeDialog(_foundArticle!.lagerbestaende[_selectedLager!] ?? 0);
+    final maxBestand = _foundArticle!.lagerbestaende[_selectedLager!]?.menge ?? 0;
+    final menge = await _showMengenEingabeDialog(maxBestand);
     if (menge == null || menge <= 0) return;
 
     final seriennummer = _gefundenesGeraet!.seriennummer;
-    final verbautesTeil = _foundArticle!;
+    final ersatzteil = _foundArticle!;
 
     try {
-      await widget.onTeilVerbauen(seriennummer, verbautesTeil, _selectedLager!, menge);
-      _showSnackbar(context, '$menge x ${verbautesTeil.bezeichnung} wurde(n) verbaut.');
+      // Rückgabewert wird hier nicht verwendet – das ist okay.
+      await widget.onTeilVerbauen(seriennummer, ersatzteil, _selectedLager!, menge);
+      _showSnackbar(context, '$menge x ${ersatzteil.bezeichnung} wurde(n) verbaut.');
       setState(() {
         _foundArticle = null;
         _selectedErsatzteil = null;
@@ -119,49 +125,50 @@ class _AufbereitungScreenState extends State<AufbereitungScreen> {
   Future<int?> _showMengenEingabeDialog(int maxMenge) {
     final controller = TextEditingController(text: '1');
     return showDialog<int>(
-        context: context,
-        builder: (context) {
-          return AlertDialog(
-            title: Text('Menge eingeben'),
-            content: TextField(
-              controller: controller,
-              keyboardType: TextInputType.number,
-              autofocus: true,
-              decoration: InputDecoration(
-                labelText: 'Anzahl',
-                hintText: 'Maximal verfügbar: $maxMenge',
-              ),
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Menge eingeben'),
+          content: TextField(
+            controller: controller,
+            keyboardType: TextInputType.number,
+            autofocus: true,
+            decoration: InputDecoration(
+              labelText: 'Anzahl',
+              hintText: 'Maximal verfügbar: $maxMenge',
             ),
-            actions: [
-              TextButton(onPressed: () => Navigator.of(context).pop(), child: Text('Abbrechen')),
-              ElevatedButton(
-                onPressed: () {
-                  final menge = int.tryParse(controller.text) ?? 0;
-                  if (menge > 0 && menge <= maxMenge) {
-                    Navigator.of(context).pop(menge);
-                  } else {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Ungültige Menge. Bitte eine Zahl zwischen 1 und $maxMenge eingeben.'), backgroundColor: Colors.red),
-                    );
-                  }
-                },
-                child: Text('Bestätigen'),
-              ),
-            ],
-          );
-        }
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Abbrechen')),
+            ElevatedButton(
+              onPressed: () {
+                final menge = int.tryParse(controller.text) ?? 0;
+                if (menge > 0 && menge <= maxMenge) {
+                  Navigator.of(context).pop(menge);
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Ungültige Menge. Bitte eine Zahl zwischen 1 und $maxMenge eingeben.'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              },
+              child: const Text('Bestätigen'),
+            ),
+          ],
+        );
+      },
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    // --- ANFANG DER ÄNDERUNG ---
-    // Erstellt eine sortierte Liste aller einzigartigen Kategorien aus den Ersatzteilen.
     final alleKategorien = widget.alleErsatzteile
         .map((teil) => teil.kategorie.isNotEmpty ? teil.kategorie : 'Sonstiges')
         .toSet()
-        .toList()..sort();
-    // --- ENDE DER ÄNDERUNG ---
+        .toList()
+      ..sort();
 
     return Scaffold(
       appBar: AppBar(
@@ -194,7 +201,10 @@ class _AufbereitungScreenState extends State<AufbereitungScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Gerät auswählen', style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold)),
+              Text(
+                'Gerät auswählen',
+                style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold),
+              ),
               const SizedBox(height: 16),
               Card(
                 elevation: 2,
@@ -204,15 +214,48 @@ class _AufbereitungScreenState extends State<AufbereitungScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      TextField(controller: _geraeteNummerController, keyboardType: TextInputType.number, decoration: InputDecoration(labelText: 'Gerätenummer eingeben', border: OutlineInputBorder(), suffixIcon: IconButton(icon: Icon(Icons.search), onPressed: _sucheGeraet, tooltip: 'Suchen')), onSubmitted: (_) => _sucheGeraet()),
+                      TextField(
+                        controller: _geraeteNummerController,
+                        keyboardType: TextInputType.number,
+                        decoration: InputDecoration(
+                          labelText: 'Gerätenummer eingeben',
+                          border: const OutlineInputBorder(),
+                          suffixIcon: IconButton(
+                            icon: const Icon(Icons.search),
+                            onPressed: _sucheGeraet,
+                            tooltip: 'Suchen',
+                          ),
+                        ),
+                        onSubmitted: (_) => _sucheGeraet(),
+                      ),
                       const SizedBox(height: 16),
-                      if (_gefundenesGeraet != null) RichText(text: TextSpan(style: Theme.of(context).textTheme.titleMedium, children: [TextSpan(text: 'Seriennummer: '), TextSpan(text: _gefundenesGeraet!.seriennummer, style: TextStyle(fontWeight: FontWeight.bold))])) else Text('Bitte geben Sie eine gültige Gerätenummer ein.', style: TextStyle(color: Colors.grey.shade600)),
+                      if (_gefundenesGeraet != null)
+                        RichText(
+                          text: TextSpan(
+                            style: Theme.of(context).textTheme.titleMedium,
+                            children: [
+                              const TextSpan(text: 'Seriennummer: '),
+                              TextSpan(
+                                text: _gefundenesGeraet!.seriennummer,
+                                style: const TextStyle(fontWeight: FontWeight.bold),
+                              ),
+                            ],
+                          ),
+                        )
+                      else
+                        Text(
+                          'Bitte geben Sie eine gültige Gerätenummer ein.',
+                          style: TextStyle(color: Colors.grey.shade600),
+                        ),
                     ],
                   ),
                 ),
               ),
               const SizedBox(height: 24),
-              Text('Ersatzteil verbauen', style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold)),
+              Text(
+                'Ersatzteil verbauen',
+                style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold),
+              ),
               const SizedBox(height: 16),
               Card(
                 elevation: 2,
@@ -222,8 +265,6 @@ class _AufbereitungScreenState extends State<AufbereitungScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // --- ANFANG DER ÄNDERUNG ---
-                      // Das Dropdown verwendet jetzt die dynamisch erstellte Liste aller Kategorien.
                       DropdownButtonFormField<String>(
                         value: _selectedPartType,
                         decoration: const InputDecoration(labelText: 'Art des Ersatzteils', border: OutlineInputBorder()),
@@ -232,14 +273,15 @@ class _AufbereitungScreenState extends State<AufbereitungScreen> {
                           if (value == null) return;
                           setState(() {
                             _selectedPartType = value;
-                            _gefilterteErsatzteile = widget.alleErsatzteile.where((teil) => (teil.kategorie.isNotEmpty ? teil.kategorie : 'Sonstiges') == value).toList();
+                            _gefilterteErsatzteile = widget.alleErsatzteile
+                                .where((teil) => (teil.kategorie.isNotEmpty ? teil.kategorie : 'Sonstiges') == value)
+                                .toList();
                             _selectedErsatzteil = null;
                             _foundArticle = null;
                             _articleNumberController.clear();
                           });
                         },
                       ),
-                      // --- ENDE DER ÄNDERUNG ---
                       const SizedBox(height: 16),
                       if (_gefilterteErsatzteile.isNotEmpty)
                         DropdownButtonFormField<Ersatzteil>(
@@ -247,7 +289,12 @@ class _AufbereitungScreenState extends State<AufbereitungScreen> {
                           value: _selectedErsatzteil,
                           hint: const Text('Gefundenes Teil auswählen'),
                           decoration: const InputDecoration(labelText: 'Bezeichnung', border: OutlineInputBorder()),
-                          items: _gefilterteErsatzteile.map((ersatzteil) => DropdownMenuItem<Ersatzteil>(value: ersatzteil, child: Text(ersatzteil.bezeichnung, overflow: TextOverflow.ellipsis))).toList(),
+                          items: _gefilterteErsatzteile
+                              .map((ersatzteil) => DropdownMenuItem<Ersatzteil>(
+                            value: ersatzteil,
+                            child: Text(ersatzteil.bezeichnung, overflow: TextOverflow.ellipsis),
+                          ))
+                              .toList(),
                           onChanged: (ersatzteil) {
                             if (ersatzteil == null) return;
                             setState(() {
@@ -258,13 +305,28 @@ class _AufbereitungScreenState extends State<AufbereitungScreen> {
                           },
                         ),
                       const SizedBox(height: 16),
-                      TextField(controller: _articleNumberController, decoration: InputDecoration(labelText: 'Artikelnummer scannen/eingeben', border: const OutlineInputBorder(), suffixIcon: IconButton(icon: const Icon(Icons.qr_code_scanner), onPressed: _sucheArtikel, tooltip: 'Suchen')), onSubmitted: (_) => _sucheArtikel()),
+                      TextField(
+                        controller: _articleNumberController,
+                        decoration: InputDecoration(
+                          labelText: 'Artikelnummer scannen/eingeben',
+                          border: const OutlineInputBorder(),
+                          suffixIcon: IconButton(
+                            icon: const Icon(Icons.qr_code_scanner),
+                            onPressed: _sucheArtikel,
+                            tooltip: 'Suchen',
+                          ),
+                        ),
+                        onSubmitted: (_) => _sucheArtikel(),
+                      ),
                       const SizedBox(height: 16),
                       if (_foundArticle != null)
                         Container(
                           width: double.infinity,
                           padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(color: Colors.green.withAlpha(26), borderRadius: BorderRadius.circular(8)),
+                          decoration: BoxDecoration(
+                            color: Colors.green.withAlpha(26),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
@@ -278,7 +340,7 @@ class _AufbereitungScreenState extends State<AufbereitungScreen> {
                                 hint: const Text('Lager auswählen'),
                                 decoration: const InputDecoration(labelText: 'Lagerort', border: OutlineInputBorder()),
                                 items: ['Hauptlager', 'Fahrzeug Patrick', 'Fahrzeug Melanie'].map((lager) {
-                                  final bestand = _foundArticle!.lagerbestaende[lager] ?? 0;
+                                  final bestand = _foundArticle!.lagerbestaende[lager]?.menge ?? 0;
                                   return DropdownMenuItem(value: lager, child: Text('$lager ($bestand Stk.)'));
                                 }).toList(),
                                 onChanged: (value) => setState(() => _selectedLager = value),
@@ -291,7 +353,9 @@ class _AufbereitungScreenState extends State<AufbereitungScreen> {
                                   label: const Text('Teil verbauen'),
                                   onPressed: (_foundArticle!.getGesamtbestand() > 0 && _selectedLager != null) ? _verbaueTeil : null,
                                   style: ElevatedButton.styleFrom(
-                                    backgroundColor: (_foundArticle!.getGesamtbestand() > 0 && _selectedLager != null) ? Colors.green : Colors.grey,
+                                    backgroundColor: (_foundArticle!.getGesamtbestand() > 0 && _selectedLager != null)
+                                        ? Colors.green
+                                        : Colors.grey,
                                     foregroundColor: Colors.white,
                                     padding: const EdgeInsets.symmetric(vertical: 12),
                                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),

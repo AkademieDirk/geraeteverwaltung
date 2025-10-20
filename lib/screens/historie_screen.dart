@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import '../models/verbautes_teil.dart';
-import '../models/geraet.dart';
-import '../models/serviceeintrag.dart';
+import 'package:projekte/models/verbautes_teil.dart';
+import 'package:projekte/models/geraet.dart';
+import 'package:projekte/models/serviceeintrag.dart';
 
 class HistorieScreen extends StatefulWidget {
+  // --- KORREKTUR: verbauteTeile wird wieder benötigt ---
   final Map<String, List<VerbautesTeil>> verbauteTeile;
   final List<Geraet> alleGeraete;
   final List<Serviceeintrag> alleServiceeintraege;
@@ -28,6 +29,7 @@ class HistorieScreen extends StatefulWidget {
 
 class _HistorieScreenState extends State<HistorieScreen> {
   final TextEditingController _seriennummerController = TextEditingController();
+
   List<VerbautesTeil> _aufbereitungsteile = [];
   List<Serviceeintrag> _serviceeintraege = [];
 
@@ -62,12 +64,16 @@ class _HistorieScreenState extends State<HistorieScreen> {
       return seriennummerMatch || kundenNameMatch;
     }).toList();
 
-    final treffer = passendeGeraete.map((g) => g.id).toSet().where((geraeteId) {
-      final geraet = widget.alleGeraete.firstWhere((g) => g.id == geraeteId);
+    final treffer = passendeGeraete
+        .map((g) => g)
+        .where((geraet) {
       final hatTeile = widget.verbauteTeile.containsKey(geraet.seriennummer) && widget.verbauteTeile[geraet.seriennummer]!.isNotEmpty;
-      final hatService = widget.alleServiceeintraege.any((e) => e.geraeteId == geraeteId);
+      final hatService = widget.alleServiceeintraege.any((e) => e.geraeteId == geraet.id);
       return hatTeile || hatService;
-    }).map((geraeteId) => widget.alleGeraete.firstWhere((g) => g.id == geraeteId).seriennummer).toList();
+    })
+        .map((geraet) => geraet.seriennummer)
+        .toSet()
+        .toList();
 
 
     if (treffer.isEmpty) {
@@ -97,7 +103,7 @@ class _HistorieScreenState extends State<HistorieScreen> {
     serviceEintraegeGefiltert.sort((a, b) => b.datum.compareTo(a.datum));
 
     final alleVerbautenTeile = widget.verbauteTeile[seriennummer] ?? [];
-    final teileKosten = alleVerbautenTeile.fold(0.0, (total, item) => total + (item.tatsaechlicherPreis));
+    final teileKosten = alleVerbautenTeile.fold(0.0, (total, item) => total + item.tatsaechlicherPreis);
 
     final inServiceVerbauteTeileIDs = serviceEintraegeGefiltert.expand((e) => e.verbauteTeile).map((t) => t.id).toSet();
     final aufbereitungsteileGefiltert = alleVerbautenTeile.where((t) => !inServiceVerbauteTeileIDs.contains(t.id)).toList();
@@ -146,7 +152,7 @@ class _HistorieScreenState extends State<HistorieScreen> {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Eintrag erfolgreich gelöscht.'), backgroundColor: Colors.green));
         _zeigeHistorieFuer(_angezeigteSeriennummer);
       } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Fehler beim Löschen: ${e.toString()}'), backgroundColor: Colors.red));
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Fehler beim Löschen: ${e.toString()}'), backgroundColor: Colors.red));
       }
     }
   }

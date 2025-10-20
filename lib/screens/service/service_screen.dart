@@ -1,10 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:url_launcher/url_launcher.dart'; // <-- WICHTIGER IMPORT
 import 'package:projekte/models/geraet.dart';
 import 'package:projekte/models/ersatzteil.dart';
+import 'package:projekte/models/verbautes_teil.dart';
 import 'package:projekte/models/serviceeintrag.dart';
-import 'package:projekte/screens/service/serviceeintrag_screen.dart';
+import 'package:projekte/screens/service/serviceeintrag_screen.dart'; // Import für den ServiceeintragScreen
+import 'dart:html' as html;
+// --- PDF GENERIERUNGS IMPORTE ---
+import 'package:pdf/pdf.dart'; // Für PDF-Formatierung
+import 'package:pdf/widgets.dart' as pw; // Für PDF-Widgets
+import 'package:printing/printing.dart'; // Für das Drucken und Anzeigen des PDFs
+import 'package:flutter/services.dart' show rootBundle; // Für das Laden von Assets/Fonts
+// --- ENDE PDF IMPORTE ---
+
 
 class ServiceScreen extends StatefulWidget {
   final List<Geraet> alleGeraete;
@@ -13,7 +21,7 @@ class ServiceScreen extends StatefulWidget {
   final Future<void> Function(Serviceeintrag) onAddServiceeintrag;
   final Future<void> Function(Serviceeintrag) onUpdateServiceeintrag;
   final Future<void> Function(String) onDeleteServiceeintrag;
-  final Future<void> Function(String, Ersatzteil, String, int) onTeilVerbauen;
+  final Future<VerbautesTeil> Function(String, Ersatzteil, String, int) onTeilVerbauen;
 
   const ServiceScreen({
     Key? key,
@@ -41,19 +49,9 @@ class _ServiceScreenState extends State<ServiceScreen> {
     super.dispose();
   }
 
-  // --- ANFANG DER KORREKTUR ---
-  Future<void> _launchURL(String urlString) async {
-    final Uri url = Uri.parse(urlString);
-    // Dieser Modus ist für Web am zuverlässigsten, um einen neuen Tab zu öffnen.
-    if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
-      if(mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Konnte den Link nicht öffnen: $urlString'), backgroundColor: Colors.red),
-        );
-      }
-    }
+  void _openInNewTab(String url) {
+    html.window.open(url, '_blank');
   }
-  // --- ENDE DER KORREKTUR ---
 
   void _deleteServiceeintrag(Serviceeintrag eintrag) async {
     final sicher = await showDialog<bool>(
@@ -73,10 +71,23 @@ class _ServiceScreenState extends State<ServiceScreen> {
     );
     if (sicher == true) {
       await widget.onDeleteServiceeintrag(eintrag.id);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Serviceeintrag gelöscht.'), backgroundColor: Colors.green),
+        );
+      }
     }
   }
 
   void _navigateToServiceeintragScreen({Serviceeintrag? eintrag}) {
+    if (_selectedGeraet == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Bitte zuerst ein Gerät auswählen.'), backgroundColor: Colors.red),
+        );
+      }
+      return;
+    }
     Navigator.push(context, MaterialPageRoute(builder: (_) => ServiceeintragScreen(
       geraet: _selectedGeraet!,
       initialEintrag: eintrag,
@@ -85,6 +96,156 @@ class _ServiceScreenState extends State<ServiceScreen> {
       onTeilVerbauen: widget.onTeilVerbauen,
     )));
   }
+
+
+  // --- PDF GENERIERUNG ---
+  Future<void> _generateServiceReportPdf(Serviceeintrag eintrag, Geraet geraet) async {
+    try {
+      final fontData = await rootBundle.load("assets/fonts/OpenSans-Regular.ttf");
+      final ttf = pw.Font.ttf(fontData);
+
+      final pdf = pw.Document();
+
+      pdf.addPage(
+        pw.MultiPage(
+          pageFormat: PdfPageFormat.a4,
+          margin: const pw.EdgeInsets.all(32),
+          build: (pw.Context context) {
+            return [
+              pw.Center(
+                child: pw.Text(
+                  'Servicebericht',
+                  style: pw.TextStyle(font: ttf, fontSize: 28, fontWeight: pw.FontWeight.bold),
+                ),
+              ),
+              pw.SizedBox(height: 20),
+              pw.Divider(),
+              pw.SizedBox(height: 20),
+
+              // Gerätedaten
+              pw.Text('Geräteinformationen', style: pw.TextStyle(font: ttf, fontSize: 18, fontWeight: pw.FontWeight.bold)),
+              pw.SizedBox(height: 8),
+              _buildInfoRow(ttf, 'Modell:', geraet.modell),
+              _buildInfoRow(ttf, 'Seriennummer:', geraet.seriennummer),
+              if (geraet.kundeName != null && geraet.kundeName!.isNotEmpty)
+                _buildInfoRow(ttf, 'Kunde:', geraet.kundeName!),
+              if (geraet.standortName != null && geraet.standortName!.isNotEmpty)
+                _buildInfoRow(ttf, 'Standort:', geraet.standortName!),
+              _buildInfoRow(ttf, 'Status:', geraet.status),
+              pw.SizedBox(height: 30),
+
+              // Serviceeintrag Details
+              pw.Text('Serviceeintrag Details', style: pw.TextStyle(font: ttf, fontSize: 18, fontWeight: pw.FontWeight.bold)),
+              pw.SizedBox(height: 8),
+              _buildInfoRow(ttf, 'Datum:', DateFormat('dd.MM.yyyy').format(eintrag.datum.toDate())),
+              _buildInfoRow(ttf, 'Mitarbeiter:', eintrag.verantwortlicherMitarbeiter),
+              pw.SizedBox(height: 15),
+
+              pw.Text('Ausgeführte Arbeiten:', style: pw.TextStyle(font: ttf, fontWeight: pw.FontWeight.bold)),
+              pw.SizedBox(height: 5),
+              pw.Container(
+                decoration: pw.BoxDecoration(border: pw.Border.all(color: PdfColors.grey300)),
+                padding: const pw.EdgeInsets.all(10),
+                child: pw.Text(eintrag.ausgefuehrteArbeiten, style: pw.TextStyle(font: ttf)),
+              ),
+              pw.SizedBox(height: 30),
+
+              // Verbaute Teile
+              if (eintrag.verbauteTeile.isNotEmpty) ...[
+                pw.Text('Verbaute Teile', style: pw.TextStyle(font: ttf, fontSize: 18, fontWeight: pw.FontWeight.bold)),
+                pw.SizedBox(height: 8),
+                pw.Table.fromTextArray(
+                  headers: ['Menge', 'Bezeichnung', 'Artikel-Nr.'],
+                  data: eintrag.verbauteTeile.map((teil) => [
+                    '${teil.menge}x',
+                    teil.ersatzteil.bezeichnung,
+                    teil.ersatzteil.artikelnummer,
+                  ]).toList(),
+                  headerStyle: pw.TextStyle(font: ttf, fontWeight: pw.FontWeight.bold, color: PdfColors.white),
+                  headerDecoration: const pw.BoxDecoration(color: PdfColors.blueGrey800),
+                  cellStyle: pw.TextStyle(font: ttf),
+                  border: pw.TableBorder.all(color: PdfColors.grey400),
+                  cellPadding: const pw.EdgeInsets.all(8),
+                  columnWidths: {
+                    0: const pw.FixedColumnWidth(1.5),
+                    1: const pw.FlexColumnWidth(3),
+                    2: const pw.FlexColumnWidth(2),
+                  },
+                ),
+                pw.SizedBox(height: 30),
+              ],
+
+              // Anhänge
+              if (eintrag.anhaenge.isNotEmpty) ...[
+                pw.Text('Anhänge (Links):', style: pw.TextStyle(font: ttf, fontSize: 18, fontWeight: pw.FontWeight.bold)),
+                pw.SizedBox(height: 8),
+                ...eintrag.anhaenge.map(
+                      (anhang) => pw.Padding(
+                    padding: const pw.EdgeInsets.only(bottom: 5),
+                    child: pw.UrlLink(
+                      destination: anhang['url']!,
+                      child: pw.Text(
+                        '🔗 ${anhang['name']!}',
+                        style: pw.TextStyle(
+                          font: ttf,
+                          color: PdfColors.blue,
+                          decoration: pw.TextDecoration.underline,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                pw.SizedBox(height: 20),
+              ],
+
+              pw.Spacer(), // Schiebt den Footer nach unten
+              pw.Divider(),
+              pw.Center(
+                child: pw.Text(
+                  'Generiert am ${DateFormat('dd.MM.yyyy HH:mm').format(DateTime.now())}',
+                  style: pw.TextStyle(font: ttf, fontSize: 10, color: PdfColors.grey),
+                ),
+              ),
+            ];
+          },
+        ),
+      );
+      await Printing.layoutPdf(
+        onLayout: (PdfPageFormat format) async => pdf.save(),
+        name: 'Servicebericht_${geraet.seriennummer}_${DateFormat('yyyyMMdd_HHmm').format(eintrag.datum.toDate())}.pdf',
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Fehler beim Generieren des PDF: ${e.toString()}'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 5),
+          ),
+        );
+      }
+    }
+  }
+
+  // Hilfsfunktion für konsistente Info-Zeilen im PDF
+  pw.Widget _buildInfoRow(pw.Font ttf, String label, String value) {
+    return pw.Padding(
+      padding: const pw.EdgeInsets.only(bottom: 3),
+      child: pw.Row(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: [
+          pw.SizedBox(
+            width: 120, // Feste Breite für das Label
+            child: pw.Text(label, style: pw.TextStyle(font: ttf, fontWeight: pw.FontWeight.bold)),
+          ),
+          pw.Expanded(
+            child: pw.Text(value, style: pw.TextStyle(font: ttf)),
+          ),
+        ],
+      ),
+    );
+  }
+
 
   Widget _buildGeraeteAuswahl() {
     List<Geraet> gefilterteGeraete = widget.alleGeraete;
@@ -198,6 +359,11 @@ class _ServiceScreenState extends State<ServiceScreen> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         IconButton(
+                          icon: const Icon(Icons.print_outlined, color: Colors.blue),
+                          tooltip: 'Servicebericht drucken',
+                          onPressed: () => _generateServiceReportPdf(eintrag, geraet),
+                        ),
+                        IconButton(
                           icon: const Icon(Icons.edit_note, color: Colors.orange),
                           tooltip: 'Eintrag bearbeiten',
                           onPressed: () => _navigateToServiceeintragScreen(eintrag: eintrag),
@@ -230,7 +396,7 @@ class _ServiceScreenState extends State<ServiceScreen> {
                                   leading: const Icon(Icons.attach_file, color: Colors.blue),
                                   title: Text(anhang['name']!, style: const TextStyle(decoration: TextDecoration.underline, color: Colors.blue)),
                                   dense: true,
-                                  onTap: () => _launchURL(anhang['url']!),
+                                  onTap: () => _openInNewTab(anhang['url']!),
                                 );
                               })
                             ]

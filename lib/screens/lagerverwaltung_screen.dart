@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart'; // Wichtig für die Datumsformatierung
 import 'package:projekte/models/ersatzteil.dart';
 import 'package:projekte/screens/zubehoer_screen.dart';
 import 'package:projekte/screens/umbuchung_screen.dart';
@@ -208,12 +209,8 @@ class _LagerverwaltungScreenState extends State<LagerverwaltungScreen> {
           ),
           const SizedBox(height: 8),
           Expanded(
-            // --- ANFANG DER ÄNDERUNG ---
-            // Prüft, ob die Suche genau einen Treffer ergeben hat
             child: _searchTerm.isNotEmpty && gefilterteErsatzteile.length == 1
-            // WENN JA: Zeige die Einzelansicht für dieses eine Teil
                 ? _buildSingleArticleView(gefilterteErsatzteile.first)
-            // WENN NEIN: Zeige die bekannte, gruppierte Kategorien-Ansicht
                 : ListView.builder(
               padding: const EdgeInsets.symmetric(horizontal: 16.0),
               itemCount: kategorien.length,
@@ -228,12 +225,34 @@ class _LagerverwaltungScreenState extends State<LagerverwaltungScreen> {
                   child: ExpansionTile(
                     title: Text(kategorie, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                     children: teileInKategorie.map((teil) {
+                      LagerbestandEintrag? letzterEintrag;
+                      if (teil.lagerbestaende.isNotEmpty) {
+                        letzterEintrag = teil.lagerbestaende.values.reduce((a, b) =>
+                        a.letzteAenderung.compareTo(b.letzteAenderung) > 0 ? a : b
+                        );
+                      }
+                      final isDemoData = letzterEintrag != null && letzterEintrag.letzteAenderung.toDate().year <= 2020;
+
                       return ListTile(
                         leading: CircleAvatar(
                           child: Text(teil.getGesamtbestand().toString()),
                         ),
                         title: Text(teil.bezeichnung),
-                        subtitle: Text('Art-Nr: ${teil.artikelnummer}'),
+                        subtitle: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('Art-Nr: ${teil.artikelnummer}'),
+                            if (letzterEintrag != null)
+                              Text(
+                                'Letzte Buchung: ${DateFormat('dd.MM.yy').format(letzterEintrag.letzteAenderung.toDate())}',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: isDemoData ? Colors.red.shade300 : Colors.grey,
+                                  fontStyle: isDemoData ? FontStyle.italic : FontStyle.normal,
+                                ),
+                              ),
+                          ],
+                        ),
                         trailing: ElevatedButton.icon(
                           icon: const Icon(Icons.add_shopping_cart, size: 18),
                           label: const Text('Einbuchen'),
@@ -249,15 +268,21 @@ class _LagerverwaltungScreenState extends State<LagerverwaltungScreen> {
                 );
               },
             ),
-            // --- ENDE DER ÄNDERUNG ---
           ),
         ],
       ),
     );
   }
 
-  // --- NEUES WIDGET FÜR DIE EINZELANSICHT ---
   Widget _buildSingleArticleView(Ersatzteil teil) {
+    LagerbestandEintrag? letzterEintrag;
+    if (teil.lagerbestaende.isNotEmpty) {
+      letzterEintrag = teil.lagerbestaende.values.reduce((a, b) =>
+      a.letzteAenderung.compareTo(b.letzteAenderung) > 0 ? a : b
+      );
+    }
+    final isDemoData = letzterEintrag != null && letzterEintrag.letzteAenderung.toDate().year <= 2020;
+
     return Padding(
       padding: const EdgeInsets.all(16.0),
       child: Card(
@@ -277,7 +302,22 @@ class _LagerverwaltungScreenState extends State<LagerverwaltungScreen> {
                   child: Text(teil.getGesamtbestand().toString(), style: const TextStyle(fontSize: 18)),
                 ),
                 title: Text(teil.bezeichnung, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-                subtitle: Text('Art-Nr: ${teil.artikelnummer} | Hersteller: ${teil.hersteller}'),
+                subtitle: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Art-Nr: ${teil.artikelnummer} | Hersteller: ${teil.hersteller}'),
+                    if (teil.scancode.isNotEmpty) Text('Scancode: ${teil.scancode}'),
+                    if (letzterEintrag != null)
+                      Text(
+                        'Letzte Buchung: ${DateFormat('dd.MM.yyyy').format(letzterEintrag.letzteAenderung.toDate())}',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: isDemoData ? Colors.red.shade300 : Colors.grey,
+                          fontStyle: isDemoData ? FontStyle.italic : FontStyle.normal,
+                        ),
+                      ),
+                  ],
+                ),
               ),
               const Divider(height: 24),
               Center(

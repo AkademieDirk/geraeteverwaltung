@@ -1,5 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:projekte/models/ersatzteil.dart';
+import 'package:cloud_firestore/cloud_firestore.dart'; // Import für Timestamp
+
+// --- Globale Liste der verfügbaren Kategorien ---
+// Zentralisiert, damit sie leicht in initState und im Dropdown verwendet werden kann.
+const List<String> verfuegbareKategorienErsatzteil = [
+  'Toner',
+  'Drum',
+  'Transferbelt',
+  'Entwickler',
+  'Fixiereinheit',
+  'Fixierung', // <-- HIER IST DIE HINZUGEFÜGTE KATEGORIE!
+  'Rollen',
+  'Sonstiges',
+];
+// --------------------------------------------------
 
 class ZubehoerScreen extends StatefulWidget {
   final List<Ersatzteil> ersatzteile;
@@ -68,6 +83,11 @@ class _ZubehoerScreenState extends State<ZubehoerScreen> {
     );
     if (sicher == true) {
       await widget.onDelete(ersatzteil.id);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('${ersatzteil.bezeichnung} wurde gelöscht.'), backgroundColor: Colors.green),
+        );
+      }
     }
   }
 
@@ -87,7 +107,10 @@ class _ZubehoerScreenState extends State<ZubehoerScreen> {
 
     final Map<String, List<Ersatzteil>> gruppierteTeile = {};
     for (final teil in gefilterteErsatzteile) {
-      final kategorie = teil.kategorie.isNotEmpty ? teil.kategorie : 'Sonstiges';
+      // Sicherstellen, dass die Kategorie im Dropdown existiert oder auf 'Sonstiges' fällt.
+      final kategorie = verfuegbareKategorienErsatzteil.contains(teil.kategorie)
+          ? teil.kategorie
+          : 'Sonstiges'; // Fallback für ungültige/alte Kategorien
       (gruppierteTeile[kategorie] ??= []).add(teil);
     }
     final kategorien = gruppierteTeile.keys.toList()..sort();
@@ -230,8 +253,11 @@ class _ErsatzteilDialogState extends State<ErsatzteilDialog> {
   final _haendlerArtikelnummerController = TextEditingController();
   final _lieferantController = TextEditingController();
   final _preisController = TextEditingController();
-  String _selectedKategorie = 'Toner';
+  // Standardwert für neue Teile, muss eine gültige Kategorie sein
+  String _selectedKategorie = verfuegbareKategorienErsatzteil.first;
   final _scancodeController = TextEditingController();
+
+  final Map<String, TextEditingController> _lagerbestandController = {};
 
   bool get isEdit => widget.ersatzteil != null;
 
@@ -246,10 +272,43 @@ class _ErsatzteilDialogState extends State<ErsatzteilDialog> {
       _haendlerArtikelnummerController.text = teil.haendlerArtikelnummer;
       _lieferantController.text = teil.lieferant;
       _preisController.text = teil.preis.toStringAsFixed(2);
-      _selectedKategorie = teil.kategorie;
+
+      // --- KORREKTUR IM INITSTATE ---
+      // Sicherstellen, dass die Kategorie des Ersatzteils in der Liste der verfügbaren Kategorien ist.
+      // Falls nicht, wird ein Standardwert ('Sonstiges') oder der erste Wert der Liste verwendet.
+      if (verfuegbareKategorienErsatzteil.contains(teil.kategorie)) {
+        _selectedKategorie = teil.kategorie;
+      } else {
+        _selectedKategorie = 'Sonstiges'; // Fallback für unbekannte Kategorien
+        // Optional: Debug-Ausgabe, falls eine ungültige Kategorie gefunden wird
+        debugPrint('WARNUNG: Ersatzteil "${teil.bezeichnung}" hat unbekannte Kategorie "${teil.kategorie}". Setze auf "${_selectedKategorie}".');
+      }
+      // ----------------------------
+
       _scancodeController.text = teil.scancode;
+
+      // Lagerbestände nur für die beim Ersatzteil vorhandenen Lagercontroller initialisieren
+      // Für neue Ersatzteile werden die Controller dynamisch erzeugt (siehe build-Methode oder submit)
+      teil.lagerbestaende.forEach((lagerName, bestandEintrag) {
+        _lagerbestandController[lagerName] = TextEditingController(text: bestandEintrag.menge.toString());
+      });
+
+      // Sicherstellen, dass für neue Ersatzteile, die Standard-Lagerbestände initialisiert werden
+      if (!isEdit && _lagerbestandController.isEmpty) {
+        teil.lagerbestaende.keys.forEach((lagerName) {
+          _lagerbestandController[lagerName] = TextEditingController(text: '0');
+        });
+      }
+
+    } else {
+      // Wenn es ein neues Ersatzteil ist, initialisiere alle Standardlager mit '0'
+      const defaultLagernamen = ['Hauptlager', 'Fahrzeug Patrick', 'Fahrzeug Melanie'];
+      for (var lagerName in defaultLagernamen) {
+        _lagerbestandController[lagerName] = TextEditingController(text: '0');
+      }
     }
   }
+
 
   @override
   void dispose() {
@@ -260,11 +319,36 @@ class _ErsatzteilDialogState extends State<ErsatzteilDialog> {
     _lieferantController.dispose();
     _preisController.dispose();
     _scancodeController.dispose();
+    _lagerbestandController.forEach((_, controller) => controller.dispose());
     super.dispose();
   }
 
   void _submit() async {
     if (_formKey.currentState!.validate()) {
+      final Map<String, LagerbestandEintrag> neueLagerbestaende = {};
+
+      // Iteriere über alle Lagerbestand-Controller und erstelle die Lagerbestands-Objekte
+      // Egal ob edit oder neu, wir nehmen die Werte aus den Textfeldern
+      for (var entry in _lagerbestandController.entries) {
+        final lagerName = entry.key;
+        final controller = entry.value;
+        final neueMenge = int.tryParse(controller.text) ?? 0; // Default auf 0, wenn ungültig
+
+        // Wenn wir im Edit-Modus sind, vergleichen wir mit dem alten Wert für das Änderungsdatum
+        Timestamp letzteAenderung = Timestamp.now();
+        if (isEdit && widget.ersatzteil!.lagerbestaende.containsKey(lagerName)) {
+          final alterEintrag = widget.ersatzteil!.lagerbestaende[lagerName]!;
+          if (neueMenge == alterEintrag.menge) {
+            letzteAenderung = alterEintrag.letzteAenderung; // Keine Änderung, altes Datum behalten
+          }
+        }
+        neueLagerbestaende[lagerName] = LagerbestandEintrag(
+          menge: neueMenge,
+          letzteAenderung: letzteAenderung,
+        );
+      }
+
+
       final neuesTeil = Ersatzteil(
         id: isEdit ? widget.ersatzteil!.id : '',
         artikelnummer: _artikelnummerController.text.trim(),
@@ -274,16 +358,28 @@ class _ErsatzteilDialogState extends State<ErsatzteilDialog> {
         lieferant: _lieferantController.text.trim(),
         preis: double.tryParse(_preisController.text.replaceAll(',', '.')) ?? 0.0,
         kategorie: _selectedKategorie,
-        lagerbestaende: isEdit ? widget.ersatzteil!.lagerbestaende : null,
+        lagerbestaende: neueLagerbestaende, // <-- Jetzt immer die neu erstellten Lagerbestaende
         scancode: _scancodeController.text.trim(),
       );
 
       if (isEdit) {
         await widget.onUpdate(neuesTeil);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('${neuesTeil.bezeichnung} wurde aktualisiert.'), backgroundColor: Colors.green),
+          );
+        }
       } else {
         await widget.onAdd(neuesTeil);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('${neuesTeil.bezeichnung} wurde hinzugefügt.'), backgroundColor: Colors.green),
+          );
+        }
       }
-      Navigator.of(context).pop();
+      if (mounted) {
+        Navigator.of(context).pop();
+      }
     }
   }
 
@@ -299,16 +395,14 @@ class _ErsatzteilDialogState extends State<ErsatzteilDialog> {
             children: [
               TextFormField(controller: _bezeichnungController, decoration: const InputDecoration(labelText: 'Bezeichnung*'), validator: (v) => v!.isEmpty ? 'Pflichtfeld' : null),
               TextFormField(controller: _artikelnummerController, decoration: const InputDecoration(labelText: 'Artikelnummer*'), validator: (v) => v!.isEmpty ? 'Pflichtfeld' : null),
-              // --- ANFANG DER KORREKTUR ---
-              TextFormField(controller: _herstellerController, decoration: const InputDecoration(labelText: 'Hersteller')), // Validator entfernt
+              TextFormField(controller: _herstellerController, decoration: const InputDecoration(labelText: 'Hersteller')),
               TextFormField(controller: _haendlerArtikelnummerController, decoration: const InputDecoration(labelText: 'Händler-Artikelnummer')),
-              TextFormField(controller: _lieferantController, decoration: const InputDecoration(labelText: 'Lieferant')), // Validator entfernt
-              // --- ENDE DER KORREKTUR ---
+              TextFormField(controller: _lieferantController, decoration: const InputDecoration(labelText: 'Lieferant')),
               TextFormField(controller: _preisController, decoration: const InputDecoration(labelText: 'Preis*', suffixText: '€'), keyboardType: TextInputType.numberWithOptions(decimal: true), validator: (v) => v!.isEmpty ? 'Pflichtfeld' : null),
               DropdownButtonFormField<String>(
                 value: _selectedKategorie,
                 decoration: const InputDecoration(labelText: 'Kategorie*'),
-                items: ['Toner', 'Drum', 'Transferbelt', 'Entwickler', 'Fixiereinheit', 'Rollen', 'Sonstiges'].map((label) => DropdownMenuItem(value: label, child: Text(label))).toList(),
+                items: verfuegbareKategorienErsatzteil.map((label) => DropdownMenuItem(value: label, child: Text(label))).toList(), // <-- VERWENDET DIE GLOBALE LISTE
                 onChanged: (value) {
                   if (value != null) {
                     setState(() => _selectedKategorie = value);
@@ -317,6 +411,22 @@ class _ErsatzteilDialogState extends State<ErsatzteilDialog> {
               ),
               const SizedBox(height: 8),
               TextFormField(controller: _scancodeController, decoration: const InputDecoration(labelText: 'Scancode (EAN/GTIN)')),
+
+              if (isEdit || _lagerbestandController.isNotEmpty) ...[ // Zeigt Lagerbestände auch beim Hinzufügen, wenn Controller vorhanden sind
+                const Divider(height: 24),
+                Text('Lagerbestände', style: Theme.of(context).textTheme.titleMedium),
+                const SizedBox(height: 8),
+                ..._lagerbestandController.entries.map((entry) {
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 4.0),
+                    child: TextFormField(
+                      controller: entry.value,
+                      decoration: InputDecoration(labelText: entry.key, border: const OutlineInputBorder()),
+                      keyboardType: TextInputType.number,
+                    ),
+                  );
+                }),
+              ],
             ],
           ),
         ),

@@ -9,14 +9,17 @@ import 'package:projekte/models/geraet.dart';
 import 'package:projekte/models/ersatzteil.dart';
 import 'package:projekte/models/verbautes_teil.dart';
 import 'package:projekte/models/serviceeintrag.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'dart:html' as html;
 
 class ServiceeintragScreen extends StatefulWidget {
   final Geraet geraet;
   final Serviceeintrag? initialEintrag;
   final List<Ersatzteil> alleErsatzteile;
   final Future<void> Function(Serviceeintrag) onSave;
-  final Future<void> Function(String, Ersatzteil, String, int) onTeilVerbauen;
+
+  // KORRIGIERTE SIGNATUR: jetzt mit erstem String-Arg (z. B. SN/geraeteId)
+  // und Rückgabewert Future<VerbautesTeil>, passend zu Aufbereitung/Service/Auswahl.
+  final Future<VerbautesTeil> Function(String, Ersatzteil, String, int) onTeilVerbauen;
 
   const ServiceeintragScreen({
     Key? key,
@@ -35,12 +38,16 @@ class _ServiceeintragScreenState extends State<ServiceeintragScreen> {
   final _formKey = GlobalKey<FormState>();
   final _arbeitenController = TextEditingController();
 
-  final List<String> _mitarbeiterOptionen = ['Nichts ausgewählt', 'Patrick Heidrich', 'Carsten Sobota', 'Melanie Toffel', 'Dirk Kraft'];
+  final List<String> _mitarbeiterOptionen = [
+    'Nichts ausgewählt',
+    'Patrick Heidrich',
+    'Carsten Sobota',
+    'Melanie Toffel',
+    'Dirk Kraft'
+  ];
   String _selectedMitarbeiter = 'Nichts ausgewählt';
   DateTime _selectedDatum = DateTime.now();
 
-  // --- KORRIGIERTE INITIALISIERUNG ---
-  // Die Listen werden jetzt sofort als leere Listen deklariert.
   List<VerbautesTeil> _verbauteTeile = [];
   List<Map<String, String>> _anhaenge = [];
 
@@ -114,7 +121,6 @@ class _ServiceeintragScreenState extends State<ServiceeintragScreen> {
       setState(() {
         _anhaenge.add({'name': fileName, 'url': downloadUrl});
       });
-
     } catch (e) {
       if (!mounted) return;
       debugPrint('Upload-Fehler: $e');
@@ -126,21 +132,16 @@ class _ServiceeintragScreenState extends State<ServiceeintragScreen> {
     }
   }
 
-  Future<void> _launchURL(String urlString) async {
-    final Uri url = Uri.parse(urlString);
-    if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
-      if(mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Konnte den Link nicht öffnen: $urlString'), backgroundColor: Colors.red),
-        );
-      }
-    }
+  void _openInNewTab(String url) {
+    html.window.open(url, '_blank');
   }
 
   void _saveEintrag() async {
     if (_formKey.currentState!.validate()) {
       if (_selectedMitarbeiter == 'Nichts ausgewählt') {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Bitte einen Mitarbeiter auswählen.'), backgroundColor: Colors.red));
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Bitte einen Mitarbeiter auswählen.'), backgroundColor: Colors.red),
+        );
         return;
       }
 
@@ -155,7 +156,7 @@ class _ServiceeintragScreenState extends State<ServiceeintragScreen> {
       );
 
       await widget.onSave(neuerEintrag);
-      if(mounted) Navigator.of(context).pop();
+      if (mounted) Navigator.of(context).pop();
     }
   }
 
@@ -206,27 +207,35 @@ class _ServiceeintragScreenState extends State<ServiceeintragScreen> {
                           Navigator.of(ctx).pop();
                           final lager = await _showLagerAuswahlDialog(teil);
                           if (lager != null) {
-                            final menge = await _showMengenEingabeDialog(teil.lagerbestaende[lager] ?? 0);
+                            final menge = await _showMengenEingabeDialog(teil.lagerbestaende[lager]?.menge ?? 0);
                             if (menge != null && menge > 0) {
                               try {
-                                await widget.onTeilVerbauen(widget.geraet.seriennummer, teil, lager, menge);
-
-                                final verbautesTeil = VerbautesTeil(
-                                  id: _uuid.v4(),
-                                  ersatzteil: teil,
-                                  installationsDatum: DateTime.now(),
-                                  tatsaechlicherPreis: teil.preis * menge,
-                                  herkunftslager: lager,
-                                  menge: menge,
+                                // KORRIGIERTER AUFRUF: geraeteId/SN als erster Parameter übergeben
+                                final verbautesTeil = await widget.onTeilVerbauen(
+                                  widget.geraet.seriennummer,
+                                  teil,
+                                  lager,
+                                  menge,
                                 );
 
                                 setState(() {
                                   _verbauteTeile.add(verbautesTeil);
                                 });
 
-                                if(mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$menge x ${teil.bezeichnung} wurde(n) hinzugefügt.'), backgroundColor: Colors.green));
+                                if (mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text('$menge x ${teil.bezeichnung} wurde(n) hinzugefügt.'),
+                                      backgroundColor: Colors.green,
+                                    ),
+                                  );
+                                }
                               } catch (e) {
-                                if(mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Fehler: ${e.toString()}'), backgroundColor: Colors.red));
+                                if (mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(content: Text('Fehler: ${e.toString()}'), backgroundColor: Colors.red),
+                                  );
+                                }
                               }
                             }
                           }
@@ -248,68 +257,70 @@ class _ServiceeintragScreenState extends State<ServiceeintragScreen> {
 
   Future<String?> _showLagerAuswahlDialog(Ersatzteil teil) {
     return showDialog<String>(
-        context: context,
-        builder: (context) {
-          return AlertDialog(
-            title: Text('Aus welchem Lager entnehmen?'),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: teil.lagerbestaende.keys.map((lager) {
-                final bestand = teil.lagerbestaende[lager] ?? 0;
-                return ListTile(
-                  title: Text('$lager ($bestand Stk.)'),
-                  onTap: () {
-                    Navigator.of(context).pop(lager);
-                  },
-                  enabled: bestand > 0,
-                );
-              }).toList(),
-            ),
-            actions: [
-              TextButton(onPressed: () => Navigator.of(context).pop(), child: Text('Abbrechen')),
-            ],
-          );
-        }
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Aus welchem Lager entnehmen?'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: teil.lagerbestaende.keys.map((lager) {
+              final bestand = teil.lagerbestaende[lager]?.menge ?? 0;
+              return ListTile(
+                title: Text('$lager ($bestand Stk.)'),
+                onTap: () {
+                  Navigator.of(context).pop(lager);
+                },
+                enabled: bestand > 0,
+              );
+            }).toList(),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Abbrechen')),
+          ],
+        );
+      },
     );
   }
 
   Future<int?> _showMengenEingabeDialog(int maxMenge) {
     final controller = TextEditingController(text: '1');
     return showDialog<int>(
-        context: context,
-        builder: (context) {
-          return AlertDialog(
-            title: Text('Menge eingeben'),
-            content: TextField(
-              controller: controller,
-              keyboardType: TextInputType.number,
-              autofocus: true,
-              decoration: InputDecoration(
-                labelText: 'Anzahl',
-                hintText: 'Maximal verfügbar: $maxMenge',
-              ),
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Menge eingeben'),
+          content: TextField(
+            controller: controller,
+            keyboardType: TextInputType.number,
+            autofocus: true,
+            decoration: InputDecoration(
+              labelText: 'Anzahl',
+              hintText: 'Maximal verfügbar: $maxMenge',
             ),
-            actions: [
-              TextButton(onPressed: () => Navigator.of(context).pop(), child: Text('Abbrechen')),
-              ElevatedButton(
-                onPressed: () {
-                  final menge = int.tryParse(controller.text) ?? 0;
-                  if (menge > 0 && menge <= maxMenge) {
-                    Navigator.of(context).pop(menge);
-                  } else {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Ungültige Menge. Bitte eine Zahl zwischen 1 und $maxMenge eingeben.'), backgroundColor: Colors.red),
-                    );
-                  }
-                },
-                child: Text('Bestätigen'),
-              ),
-            ],
-          );
-        }
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Abbrechen')),
+            ElevatedButton(
+              onPressed: () {
+                final menge = int.tryParse(controller.text) ?? 0;
+                if (menge > 0 && menge <= maxMenge) {
+                  Navigator.of(context).pop(menge);
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Ungültige Menge. Bitte eine Zahl zwischen 1 und $maxMenge eingeben.'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              },
+              child: const Text('Bestätigen'),
+            ),
+          ],
+        );
+      },
     );
   }
-
 
   @override
   Widget build(BuildContext context) {
@@ -331,7 +342,10 @@ class _ServiceeintragScreenState extends State<ServiceeintragScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Für Gerät: ${widget.geraet.modell} (SN: ${widget.geraet.seriennummer})', style: Theme.of(context).textTheme.titleLarge),
+              Text(
+                'Für Gerät: ${widget.geraet.modell} (SN: ${widget.geraet.seriennummer})',
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
               const SizedBox(height: 24),
 
               Row(
@@ -339,7 +353,10 @@ class _ServiceeintragScreenState extends State<ServiceeintragScreen> {
                   Expanded(
                     child: DropdownButtonFormField<String>(
                       value: _selectedMitarbeiter,
-                      decoration: const InputDecoration(labelText: 'Verantwortlicher Mitarbeiter*', border: OutlineInputBorder()),
+                      decoration: const InputDecoration(
+                        labelText: 'Verantwortlicher Mitarbeiter*',
+                        border: OutlineInputBorder(),
+                      ),
                       items: _mitarbeiterOptionen.map((m) => DropdownMenuItem(value: m, child: Text(m))).toList(),
                       onChanged: (val) => setState(() => _selectedMitarbeiter = val ?? 'Nichts ausgewählt'),
                     ),
@@ -347,7 +364,10 @@ class _ServiceeintragScreenState extends State<ServiceeintragScreen> {
                   const SizedBox(width: 16),
                   Expanded(
                     child: ListTile(
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4), side: BorderSide(color: Colors.grey.shade400)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(4),
+                        side: BorderSide(color: Colors.grey.shade400),
+                      ),
                       title: Text("Datum: ${DateFormat('dd.MM.yyyy').format(_selectedDatum)}"),
                       trailing: const Icon(Icons.calendar_today),
                       onTap: () => _selectDate(context),
@@ -397,8 +417,12 @@ class _ServiceeintragScreenState extends State<ServiceeintragScreen> {
                   return Card(
                     child: ListTile(
                       leading: const Icon(Icons.description, color: Colors.blue),
-                      title: Text(anhang['name']!, overflow: TextOverflow.ellipsis, style: const TextStyle(decoration: TextDecoration.underline, color: Colors.blue)),
-                      onTap: () => _launchURL(anhang['url']!),
+                      title: Text(
+                        anhang['name']!,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(decoration: TextDecoration.underline, color: Colors.blue),
+                      ),
+                      onTap: () => _openInNewTab(anhang['url']!),
                       trailing: IconButton(
                         icon: const Icon(Icons.remove_circle, color: Colors.red),
                         onPressed: () {
